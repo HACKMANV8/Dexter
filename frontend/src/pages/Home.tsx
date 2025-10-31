@@ -13,9 +13,8 @@ const marketIndices = [
   { name: "S&P 500", symbol: "^GSPC", price: 4783.23, change: 45.12, changePercent: 0.95 },
 ];
 
-// Extended chart data for better visualization
-const generateChartData = (days: number, baseValue: number) => {
-  return Array.from({ length: days }, (_, i) => {
+const generateChartData = (days, baseValue) =>
+  Array.from({ length: days }, (_, i) => {
     const trend = i * 15;
     const noise = Math.sin(i / 3) * 300 + Math.random() * 200;
     return {
@@ -24,7 +23,6 @@ const generateChartData = (days: number, baseValue: number) => {
       volume: Math.floor(Math.random() * 1000000) + 500000,
     };
   });
-};
 
 const chartData = generateChartData(90, 20000);
 
@@ -44,7 +42,6 @@ const topLosers = [
   { symbol: "MARUTI", name: "Maruti Suzuki", price: 10450.30, change: -0.75, volume: "0.8M" },
 ];
 
-// Sector performance data
 const sectorData = [
   { sector: "IT", performance: 2.5, value: 25 },
   { sector: "Banking", performance: 1.8, value: 30 },
@@ -55,13 +52,11 @@ const sectorData = [
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-// Volume data for bar chart
 const volumeData = chartData.slice(-30).map((d, i) => ({
   time: i,
   volume: d.volume,
 }));
 
-// Market stats
 const marketStats = [
   { label: "Market Cap", value: "₹245.8T", change: "+2.3%", icon: DollarSign },
   { label: "Total Volume", value: "156.2M", change: "+5.1%", icon: Activity },
@@ -73,7 +68,6 @@ export default function Home() {
   const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [liveUpdate, setLiveUpdate] = useState(0);
 
-  // Simulate live updates
   useEffect(() => {
     const interval = setInterval(() => {
       setLiveUpdate(prev => prev + 1);
@@ -82,10 +76,10 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen animate-fade-in">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-black animate-fade-in">
       <Header />
-      
-      <div className="p-8 space-y-8">
+      <div className="max-w-screen-2xl mx-auto py-8 px-4 space-y-8">
+
         {/* Market Stats Overview */}
         <section className="animate-slide-up">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -138,7 +132,6 @@ export default function Home() {
               ))}
             </div>
           </div>
-
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart data={chartData}>
               <defs>
@@ -165,7 +158,6 @@ export default function Home() {
               />
             </AreaChart>
           </ResponsiveContainer>
-
           {/* Volume Chart Below */}
           <div className="mt-6 pt-6 border-t border-border">
             <h3 className="text-sm font-semibold mb-4 text-muted-foreground">Trading Volume</h3>
@@ -213,7 +205,6 @@ export default function Home() {
               ))}
             </div>
           </div>
-
           {/* Market Distribution */}
           <div className="glass rounded-2xl p-6">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
@@ -284,7 +275,6 @@ export default function Home() {
               ))}
             </div>
           </div>
-
           {/* Top Losers */}
           <div className="glass rounded-2xl p-6">
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">

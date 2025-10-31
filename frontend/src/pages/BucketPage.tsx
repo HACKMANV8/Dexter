@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/Header";
+import Header from "../components/Header";
 import {
   Plus,
   Trash2,
@@ -9,26 +9,13 @@ import {
   BarChart3,
   Search,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
-interface BucketStock {
-  id: string;
-  symbol: string;
-  name: string;
-  price: number;
-  quantity: number;
-  sentiment: number; // 0-100
-  technical: number; // 0-100
-  fundamental: number; // 0-100
-  status: "investable" | "risky";
-}
-
-function randomInt(min: number, max: number) {
+function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function makeFakeMetrics(typeHint?: string) {
-  // Slightly bias metrics by typeHint to feel realistic
+function makeFakeMetrics(typeHint) {
   const bias =
     typeHint === "bank"
       ? { s: -10, t: -5, f: -5 }
@@ -41,23 +28,16 @@ function makeFakeMetrics(typeHint?: string) {
   const sentiment = Math.max(12, Math.min(98, 50 + randomInt(-30, 35) + bias.s));
   const technical = Math.max(8, Math.min(96, 50 + randomInt(-40, 40) + bias.t));
   const fundamental = Math.max(10, Math.min(99, 50 + randomInt(-35, 45) + bias.f));
-
-  return {
-    sentiment,
-    technical,
-    fundamental,
-  };
+  return { sentiment, technical, fundamental };
 }
 
-function computeStatus(sentiment: number, technical: number, fundamental: number) {
-  // simple heuristic: average > 60 => investable, else risky
+function computeStatus(sentiment, technical, fundamental) {
   const avg = (sentiment + technical + fundamental) / 3;
   return avg >= 60 ? "investable" : "risky";
 }
 
 export default function BucketPage() {
-  // initial fake bucket — expanded list for demo + variety
-  const [bucket, setBucket] = useState<BucketStock[]>(
+  const [bucket, setBucket] = useState(
     [
       {
         id: "1",
@@ -141,18 +121,14 @@ export default function BucketPage() {
         status: "investable",
       },
     ].map((s) => ({
-      // ensure status matches generated metrics for realism
       ...s,
       status: computeStatus(s.sentiment, s.technical, s.fundamental),
     }))
   );
 
-  // Add dialog state & form
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<
-    { symbol: string; name: string; hint?: string }[]
-  >([]);
+  const [searchResults, setSearchResults] = useState([]);
   const [form, setForm] = useState({
     symbol: "",
     name: "",
@@ -168,7 +144,7 @@ export default function BucketPage() {
   const investableCount = bucket.filter((s) => s.status === "investable").length;
   const riskyCount = bucket.filter((s) => s.status === "risky").length;
 
-  function removeStock(id: string) {
+  function removeStock(id) {
     const stock = bucket.find((b) => b.id === id);
     const ok = window.confirm(
       `Delete ${stock?.symbol ?? "this stock"} from bucket? This cannot be undone.`
@@ -185,15 +161,12 @@ export default function BucketPage() {
     setShowAddDialog(true);
   }
 
-  function onSearchMock(q: string) {
-    // Fake "search" results (simulate lookup)
+  function onSearchMock(q) {
     const qUp = q.trim().toUpperCase();
     if (!qUp) {
       setSearchResults([]);
       return;
     }
-
-    // Some canned suggestions, filter by query
     const pool = [
       { symbol: "HCLTECH", name: "HCL Technologies", hint: "tech" },
       { symbol: "WIPRO", name: "Wipro Ltd", hint: "tech" },
@@ -206,16 +179,13 @@ export default function BucketPage() {
       { symbol: "HINDUNILVR", name: "Hindustan Unilever", hint: "fmcg" },
       { symbol: "ZEEL", name: "Zee Entertainment", hint: "media" },
     ];
-
     const matches = pool.filter(
       (p) => p.symbol.includes(qUp) || p.name.toUpperCase().includes(qUp)
     );
-
-    // If no matches, show a few suggestions anyway
     setSearchResults(matches.length > 0 ? matches : pool.slice(0, 6));
   }
 
-  function pickSearchResult(r: { symbol: string; name: string; hint?: string }) {
+  function pickSearchResult(r) {
     setForm({
       symbol: r.symbol,
       name: r.name,
@@ -257,9 +227,9 @@ export default function BucketPage() {
 
     const price = Number(Number(form.price).toFixed(2));
     const quantity = Math.max(1, Math.floor(Number(form.quantity)));
-
     const status = computeStatus(metrics.sentiment, metrics.technical, metrics.fundamental);
-    const newStock: BucketStock = {
+
+    const newStock = {
       id: `${Date.now()}-${Math.floor(Math.random() * 9999)}`,
       symbol: form.symbol.toUpperCase(),
       name: form.name,
@@ -278,7 +248,6 @@ export default function BucketPage() {
   return (
     <div className="min-h-screen animate-fade-in bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-black">
       <Header />
-
       <div className="p-8 space-y-10">
         {/* Header Section */}
         <div className="flex items-start justify-between animate-slide-up">
@@ -300,46 +269,35 @@ export default function BucketPage() {
         </div>
 
         {/* Stats Overview */}
-        <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up"
-          style={{ animationDelay: "0.1s" }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="glass rounded-2xl p-6 hover:scale-[1.02] transition">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-primary" />
               </div>
-              <span className="text-sm text-muted-foreground">
-                Total Investment
-              </span>
+              <span className="text-sm text-muted-foreground">Total Investment</span>
             </div>
             <p className="text-3xl font-bold text-primary">
               ₹{totalInvestment.toLocaleString()}
             </p>
           </div>
-
           <div className="glass rounded-2xl p-6 hover:glow-green transition">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-secondary" />
               </div>
-              <span className="text-sm text-muted-foreground">
-                Investable Stocks
-              </span>
+              <span className="text-sm text-muted-foreground">Investable Stocks</span>
             </div>
             <p className="text-3xl font-bold text-secondary">
               {investableCount}
             </p>
           </div>
-
           <div className="glass rounded-2xl p-6 hover:scale-[1.02] transition">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-destructive" />
               </div>
-              <span className="text-sm text-muted-foreground">
-                Risky Stocks
-              </span>
+              <span className="text-sm text-muted-foreground">Risky Stocks</span>
             </div>
             <p className="text-3xl font-bold text-destructive">{riskyCount}</p>
           </div>
@@ -375,7 +333,6 @@ export default function BucketPage() {
                     <p className="text-sm text-muted-foreground">{stock.name}</p>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-2xl font-bold">₹{stock.price.toLocaleString()}</p>
@@ -390,7 +347,6 @@ export default function BucketPage() {
                   </button>
                 </div>
               </div>
-
               {/* Analysis Bars */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="glass rounded-xl p-3">
@@ -405,7 +361,6 @@ export default function BucketPage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="glass rounded-xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">Technical</p>
                   <div className="flex items-center justify-between">
@@ -418,7 +373,6 @@ export default function BucketPage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="glass rounded-xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">Fundamental</p>
                   <div className="flex items-center justify-between">
@@ -432,8 +386,6 @@ export default function BucketPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Status Tag */}
               <div
                 className={cn(
                   "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold shadow-sm",
@@ -457,7 +409,6 @@ export default function BucketPage() {
             </div>
           ))}
         </div>
-
         {/* Portfolio Footer */}
         <div className="flex justify-center items-center gap-3 text-muted-foreground pt-6">
           <BarChart3 className="w-4 h-4" />
@@ -466,7 +417,6 @@ export default function BucketPage() {
           </p>
         </div>
       </div>
-
       {/* -------------------- Add Stock Dialog (simple modal) -------------------- */}
       {showAddDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -484,7 +434,6 @@ export default function BucketPage() {
                 ✕
               </button>
             </div>
-
             {/* Fake search */}
             <div className="mb-3">
               <label className="text-sm text-muted-foreground">Search symbol or company</label>
@@ -495,7 +444,7 @@ export default function BucketPage() {
                     setSearchQuery(e.target.value);
                     onSearchMock(e.target.value);
                   }}
-                  className="w-full input"
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none transition-all focus:border-primary focus:bg-card"
                   placeholder="e.g. HCLTECH, Axis Bank, Titan..."
                 />
                 <button
@@ -506,7 +455,6 @@ export default function BucketPage() {
                   Search
                 </button>
               </div>
-
               {searchResults.length > 0 && (
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {searchResults.map((r) => (
@@ -522,7 +470,6 @@ export default function BucketPage() {
                 </div>
               )}
             </div>
-
             {/* Form */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -530,44 +477,39 @@ export default function BucketPage() {
                 <input
                   value={form.symbol}
                   onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                  className="w-full input mt-2"
+                  className="w-full px-4 py-2 mt-2 rounded-lg border border-slate-300 bg-white dark:bg-gray-900 text-slate-900 dark:text-white outline-none transition-all focus:border-primary focus:bg-card"
                   placeholder="RELIANCE"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-muted-foreground">Company name</label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full input mt-2"
+                  className="w-full px-4 py-2 mt-2 rounded-lg border border-slate-300 bg-white dark:bg-gray-900 text-slate-900 dark:text-white outline-none transition-all focus:border-primary focus:bg-card"
                   placeholder="Reliance Industries"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-muted-foreground">Price (₹)</label>
                 <input
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  className="w-full input mt-2"
+                  className="w-full px-4 py-2 mt-2 rounded-lg border border-slate-300 bg-white dark:bg-gray-900 text-slate-900 dark:text-white outline-none transition-all focus:border-primary focus:bg-card"
                   placeholder="e.g. 1500.00"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-muted-foreground">Quantity</label>
                 <input
                   value={form.quantity}
                   onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                  className="w-full input mt-2"
+                  className="w-full px-4 py-2 mt-2 rounded-lg border border-slate-300 bg-white dark:bg-gray-900 text-slate-900 dark:text-white outline-none transition-all focus:border-primary focus:bg-card"
                   placeholder="e.g. 5"
                 />
               </div>
             </div>
-
             {formError && <p className="text-sm text-destructive mt-3">{formError}</p>}
-
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowAddDialog(false)}

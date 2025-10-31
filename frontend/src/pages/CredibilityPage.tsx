@@ -13,7 +13,6 @@ interface BucketStock {
   status: string;
 }
 
-// Sample stock database with 15 stocks
 const stockDatabase = [
   { symbol: "RELIANCE", name: "Reliance Industries", price: 2456.75, sentiment: 85, technical: 78, fundamental: 92 },
   { symbol: "TCS", name: "Tata Consultancy Services", price: 3678.50, sentiment: 88, technical: 82, fundamental: 89 },
@@ -42,7 +41,7 @@ const INITIAL_BUCKET: BucketStock[] = [
     sentiment: 80,
     technical: 75,
     fundamental: 78,
-    status: "investable"
+    status: "investable",
   },
   {
     id: "2",
@@ -53,8 +52,8 @@ const INITIAL_BUCKET: BucketStock[] = [
     sentiment: 65,
     technical: 68,
     fundamental: 64,
-    status: "investable"
-  }
+    status: "investable",
+  },
 ];
 
 export default function BucketPage() {
@@ -73,9 +72,7 @@ export default function BucketPage() {
       alert('Please select a stock and enter quantity');
       return;
     }
-
     const avgScore = (selectedStock.sentiment + selectedStock.technical + selectedStock.fundamental) / 3;
-
     const stock: BucketStock = {
       id: Date.now().toString(),
       symbol: selectedStock.symbol,
@@ -87,7 +84,6 @@ export default function BucketPage() {
       fundamental: selectedStock.fundamental,
       status: avgScore >= 65 ? 'investable' : 'risky',
     };
-
     setBucket([...bucket, stock]);
     setSelectedStock(null);
     setQuantity('');
@@ -102,70 +98,91 @@ export default function BucketPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-black">
       <Header />
-      <div className="max-w-screen-md mx-auto py-8 px-2">
-        <h1 className="text-2xl font-bold mb-4">My Stock Bucket</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={() => setShowAddDialog(true)}>Add Stock</button>
-        <div className="my-6 grid gap-4">
+      <div className="max-w-screen-lg mx-auto py-8 px-4">
+        {/* Header/Stats */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-5xl font-extrabold gradient-text mb-3">My Stock Bucket</h1>
+          <button 
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 font-semibold text-white shadow-lg hover:scale-105 transition glow-violet"
+            onClick={() => setShowAddDialog(true)}
+          >
+            Add Stock
+          </button>
+        </div>
+
+        {/* Stocks */}
+        <div className="my-6 grid gap-6">
           {bucket.map(stock => (
-            <div key={stock.id} className="glass p-4 rounded-xl flex items-center justify-between">
+            <div 
+              key={stock.id} 
+              className={`glass rounded-2xl p-6 flex justify-between items-center border-l-4 ${stock.status === "investable"
+                ? "border-green-500 hover:glow-green"
+                : "border-red-500 hover:glow"}`}
+            >
               <div>
-                <div className="font-semibold">{stock.symbol} - {stock.name}</div>
-                <div>₹{stock.price} x {stock.quantity}</div>
-                <div>Sentiment: {stock.sentiment} | Tech: {stock.technical} | Fund: {stock.fundamental} | Status: <b>{stock.status}</b></div>
+                <div className="font-semibold text-xl">
+                  {stock.symbol} <span className="text-slate-400 text-base">- {stock.name}</span>
+                </div>
+                <div className="text-lg font-bold mt-2 text-blue-700 dark:text-blue-300">₹{stock.price} × {stock.quantity}</div>
+                <div className="flex gap-4 text-sm mt-2">
+                  <span className={stock.sentiment >= 70 ? "text-green-600" : "text-red-600"}>Sent: {stock.sentiment}%</span>
+                  <span className={stock.technical >= 70 ? "text-green-600" : "text-red-600"}>Tech: {stock.technical}%</span>
+                  <span className={stock.fundamental >= 70 ? "text-green-600" : "text-red-600"}>Fund: {stock.fundamental}%</span>
+                  <span className={stock.status === "investable" ? "bg-green-50 text-green-600 px-3 py-1 rounded-full font-semibold" : "bg-red-50 text-red-600 px-3 py-1 rounded-full font-semibold"}>{stock.status}</span>
+                </div>
               </div>
-              <button onClick={() => removeStock(stock.id)} className="ml-4 px-2 py-1 bg-red-500 text-white rounded">Remove</button>
+              <button 
+                onClick={() => removeStock(stock.id)}
+                className="ml-6 px-4 py-2 bg-red-500 text-white rounded-xl shadow hover:scale-110 transition"
+              >
+                Remove
+              </button>
             </div>
           ))}
         </div>
 
-        {/* Add Stock Dialog with Search */}
+        {/* Add Stock Modal */}
         {showAddDialog && (
-          <div className="fixed z-10 left-0 top-0 w-full h-full flex items-center justify-center bg-black/50">
-            <div className="bg-white p-6 rounded-xl min-w-[400px] max-h-[80vh] overflow-y-auto">
-              <h2 className="mb-4 font-bold text-xl">Add Stock to Bucket</h2>
-              
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="relative w-full max-w-md p-7 bg-white dark:bg-gray-900 rounded-2xl glass shadow-2xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold text-xl">Add Stock to Bucket</h2>
+                <button className="text-xl" onClick={() => {
+                  setShowAddDialog(false);
+                  setSelectedStock(null);
+                  setQuantity('');
+                  setSearchQuery('');
+                }}>✕</button>
+              </div>
               {/* Search Box */}
-              <input 
-                type="text" 
-                placeholder="Search by symbol or name..." 
-                className="border px-3 py-2 mb-3 w-full rounded" 
-                value={searchQuery} 
-                onChange={e => setSearchQuery(e.target.value)} 
+              <input
+                type="text"
+                placeholder="Search by symbol or name..."
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-white dark:bg-gray-800 text-slate-900 dark:text-white outline-none mb-4 focus:border-blue-500 transition-all"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
               />
-
               {/* Stock List */}
-              <div className="max-h-60 overflow-y-auto mb-4 space-y-2">
+              <div className="max-h-56 overflow-y-auto mb-4 space-y-2">
                 {filteredStocks.length > 0 ? (
                   filteredStocks.map((stock) => (
                     <div
                       key={stock.symbol}
                       onClick={() => setSelectedStock(stock)}
-                      className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                        selectedStock?.symbol === stock.symbol
-                          ? 'border-blue-600 bg-blue-50'
-                          : 'border-gray-300 hover:border-blue-400'
-                      }`}
+                      className={`border rounded-xl px-4 py-3 cursor-pointer transition-all flex justify-between items-center ${selectedStock?.symbol === stock.symbol ? 'border-blue-600 bg-blue-50 dark:bg-blue-950' : 'border-gray-300 hover:border-blue-400'}`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-bold">{stock.symbol}</p>
-                          <p className="text-sm text-gray-600">{stock.name}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold">₹{stock.price.toLocaleString()}</p>
-                          <div className="flex gap-2 text-xs mt-1">
-                            <span className={stock.sentiment >= 70 ? "text-green-600" : "text-red-600"}>
-                              S: {stock.sentiment}%
-                            </span>
-                            <span className={stock.technical >= 70 ? "text-green-600" : "text-red-600"}>
-                              T: {stock.technical}%
-                            </span>
-                            <span className={stock.fundamental >= 70 ? "text-green-600" : "text-red-600"}>
-                              F: {stock.fundamental}%
-                            </span>
-                          </div>
+                      <div>
+                        <p className="font-bold text-base">{stock.symbol}</p>
+                        <p className="text-xs text-slate-500">{stock.name}</p>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <p className="font-semibold text-blue-600 dark:text-blue-300">₹{stock.price.toLocaleString()}</p>
+                        <div className="flex gap-2 text-xs">
+                          <span className={stock.sentiment >= 70 ? "text-green-700" : "text-red-700"}>S: {stock.sentiment}%</span>
+                          <span className={stock.technical >= 70 ? "text-green-700" : "text-red-700"}>T: {stock.technical}%</span>
+                          <span className={stock.fundamental >= 70 ? "text-green-700" : "text-red-700"}>F: {stock.fundamental}%</span>
                         </div>
                       </div>
                     </div>
@@ -174,33 +191,31 @@ export default function BucketPage() {
                   <p className="text-center text-gray-500 py-4">No stocks found</p>
                 )}
               </div>
-
               {/* Quantity Input */}
               {selectedStock && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-1">Quantity</label>
-                  <input 
-                    type="number" 
-                    placeholder="Enter quantity" 
-                    className="border px-3 py-2 w-full rounded" 
-                    value={quantity} 
-                    onChange={e => setQuantity(e.target.value)} 
+                  <input
+                    type="number"
+                    placeholder="Enter quantity"
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-white dark:bg-gray-800 text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-all"
+                    value={quantity}
+                    onChange={e => setQuantity(e.target.value)}
                     min="1"
                   />
                 </div>
               )}
-
               {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button 
-                  className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed" 
+              <div className="flex gap-2 justify-end">
+                <button
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold shadow hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={addStock}
                   disabled={!selectedStock || !quantity}
                 >
                   Add to Bucket
                 </button>
-                <button 
-                  className="bg-gray-300 px-4 py-2 rounded" 
+                <button
+                  className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl shadow"
                   onClick={() => {
                     setShowAddDialog(false);
                     setSelectedStock(null);

@@ -2,19 +2,8 @@ import Header from "@/components/Header";
 import { TrendingUp, Newspaper, BarChart3, Sparkles } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 
-interface TrendStock {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  trendScore: number;
-  newsCount: number;
-  analysis: string;
-  chartData: number[];
-}
-
-const trendingStocks: TrendStock[] = [
+// 10 trending stocks (expand this array to 50 if you want more)
+const trendingStocks = [
   {
     symbol: "ADANIENT",
     name: "Adani Enterprises",
@@ -44,8 +33,8 @@ const trendingStocks: TrendStock[] = [
     change: 89.50,
     changePercent: 7.82,
     trendScore: 87,
-    analysis: "Major contract wins announced. Strong technical breakout patterns observed.",
     newsCount: 22,
+    analysis: "Major contract wins announced. Strong technical breakout patterns observed.",
     chartData: [1100, 1120, 1150, 1180, 1200, 1220, 1235],
   },
   {
@@ -70,14 +59,28 @@ const trendingStocks: TrendStock[] = [
     analysis: "AI and cloud computing deals showing strong pipeline growth.",
     chartData: [4800, 4900, 5000, 5100, 5150, 5200, 5235],
   },
+  {
+    symbol: "TCS", name: "Tata Consultancy", price: 3678.50, change: 88.1, changePercent: 2.45, trendScore: 82, newsCount: 18, analysis: "Strong quarterly results, new major contracts.", chartData: [3500,3520,3590,3610,3630,3650,3678],
+  },
+  {
+    symbol: "INFY", name: "Infosys Limited", price: 1543.20, change: 65.02, changePercent: 2.5, trendScore: 80, newsCount: 14, analysis: "International expansion. Analyst buy ratings.", chartData: [1500,1510,1515,1530,1532,1536,1543],
+  },
+  {
+    symbol: "ICICI", name: "ICICI Bank", price: 987.45, change: 49.12, changePercent: 3.8, trendScore: 78, newsCount: 12, analysis: "Record profit margins. FII inflows strong.", chartData: [900,925,940,950,963,980,987],
+  },
+  {
+    symbol: "HDFC", name: "HDFC Bank", price: 1678.90, change: 77.46, changePercent: 4.8, trendScore: 85, newsCount: 27, analysis: "Merger benefits drive up confidence.", chartData: [1600,1620,1635,1652,1660,1670,1678],
+  },
+  {
+    symbol: "ITC", name: "ITC Limited", price: 425.90, change: 16.7, changePercent: 1.6, trendScore: 79, newsCount: 21, analysis: "FMCG division expansion. Dividend increases.", chartData: [400,405,410,413,420,423,426],
+  },
 ];
 
 export default function TrendsPage() {
   return (
-    <div className="min-h-screen animate-fade-in">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-black animate-fade-in">
       <Header />
-
-      <div className="p-8 space-y-8">
+      <div className="p-8 space-y-8 max-w-screen-xl mx-auto">
         {/* Header */}
         <div className="text-center space-y-4 animate-slide-up">
           <div className="inline-block p-4 rounded-2xl glass glow-green">
@@ -88,7 +91,6 @@ export default function TrendsPage() {
             AI-curated investment opportunities based on real-time market trends, news sentiment, and technical analysis
           </p>
         </div>
-
         {/* Trend Strength Indicator */}
         <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center justify-between">
@@ -110,14 +112,12 @@ export default function TrendsPage() {
             </div>
           </div>
         </div>
-
         {/* Trending Stocks */}
         <div className="space-y-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-secondary" />
             Hot Investment Opportunities
           </h2>
-
           <div className="space-y-4">
             {trendingStocks.map((stock, index) => (
               <div
@@ -132,7 +132,6 @@ export default function TrendsPage() {
                       <h3 className="text-2xl font-bold">{stock.symbol}</h3>
                       <p className="text-sm text-muted-foreground">{stock.name}</p>
                     </div>
-
                     <div>
                       <p className="text-3xl font-bold">₹{stock.price.toLocaleString()}</p>
                       <div className="flex items-center gap-2 mt-1">
@@ -144,13 +143,11 @@ export default function TrendsPage() {
                         </span>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Newspaper className="w-4 h-4" />
                       <span>{stock.newsCount} news articles today</span>
                     </div>
                   </div>
-
                   {/* Chart */}
                   <div className="flex items-center justify-center">
                     <ResponsiveContainer width="100%" height={120}>
@@ -165,7 +162,6 @@ export default function TrendsPage() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-
                   {/* Analysis */}
                   <div className="space-y-4">
                     <div>
@@ -180,11 +176,9 @@ export default function TrendsPage() {
                         />
                       </div>
                     </div>
-
                     <div className="glass rounded-xl p-4 bg-secondary/5">
                       <p className="text-sm leading-relaxed">{stock.analysis}</p>
                     </div>
-
                     <button className="w-full py-3 rounded-xl bg-gradient-to-r from-secondary to-secondary/80 font-semibold hover:scale-105 transition-all duration-300 glow-green">
                       View Detailed Analysis
                     </button>
