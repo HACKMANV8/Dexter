@@ -13,7 +13,7 @@ from .scoring import score_fundamentals, recommendation_from_score
 import sys, os
 # This line allows this file to import 'constants.py' from the parent directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from constants import NIFTY_50, NIFTY_NEXT_50, SENSEX_30
+from Analytics.Fundamentals.constants import NIFTY_50, NIFTY_NEXT_50, SENSEX_30
 
 
 def _safe_div(a, b):

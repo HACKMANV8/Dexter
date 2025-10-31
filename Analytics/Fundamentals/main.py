@@ -5,7 +5,7 @@
 # Import the main analysis function from our package
 from stock_analyzer import analyze_ticker
 # Import the list of tickers from our constants file
-from constants import tickers_to_test
+from Analytics.Fundamentals.constants import tickers_to_test
 
 if __name__ == '__main__':
     
