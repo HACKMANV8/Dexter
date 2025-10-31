@@ -1,6 +1,3 @@
-# signals.py
-# Contains functions for generating final signals and stop-loss.
-
 import pandas as pd
 from config import ANOMALY_Z_THRESHOLD
 
@@ -30,12 +27,10 @@ def recommend_signal(score, confidence, latest, breakdown):
 
 
 def smart_stop(latest, signal):
-    # <-- FIX: Ensure price is accessed safely as a float
     price = latest.get("Close", 0.0) 
-    if price <= 0: # If price is 0 or negative, stop is 0
+    if price <= 0:
         return 0.0
 
-    # FIX: Default ATR if it's missing or zero (prevent division/subtraction errors)
     atr = latest.get("ATR", price * 0.01) 
     if atr <= 0 or pd.isna(atr):
         atr = price * 0.01
@@ -51,3 +46,16 @@ def smart_stop(latest, signal):
         
     stop = min(stop, price * 0.995) 
     return max(0.0, stop)
+
+def interpret_score(score):
+    """Provides a simple text interpretation of the technical score."""
+    if score > 70:
+        return "✅ Strong Technical Buy"
+    elif score > 60:
+        return "👍 Moderate Technical Buy"
+    elif score < 40:
+        return "👎 Moderate Technical Sell/Avoid"
+    elif score < 30:
+        return "❌ Strong Technical Sell/Avoid"
+    else:
+        return "Hold"

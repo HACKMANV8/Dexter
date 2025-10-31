@@ -1,13 +1,9 @@
-# scoring.py
-# Contains functions for weighting features and calculating score/confidence.
-
 import math
 import pandas as pd
 from config import BASE_WEIGHTS
 
 def adapt_weights(base_weights, features, df):
     w = base_weights.copy()
-    # <-- FIX: Ensure ADX is retrieved safely as a float
     adx_val = float(features.get("ADX", 0)) 
     trend_boost = max(0, adx_val)
     
@@ -35,7 +31,6 @@ def aggregate_score(features, weights):
     breakdown = {}
     for k, w in weights.items():
         val = features.get(k, 0.0)
-        # Ensure val is a float, not NaN or Inf
         if not isinstance(val, (int, float)) or pd.isna(val) or not math.isfinite(val):
             val = 0.0
         contr = w * val
@@ -44,7 +39,6 @@ def aggregate_score(features, weights):
         
     score = (s + 1.0) / 2.0 * 100.0
     
-    # Final check: If the score still resolves to NaN (e.g., if s was NaN), use fallback.
     if pd.isna(score) or not math.isfinite(score):
         score = 50.0
         
@@ -55,8 +49,6 @@ def compute_confidence(breakdown, features):
     mag = sum(abs(v) for v in breakdown.values())
     adx_bias = abs(features.get("ADX", 0))
     
-    # Confidence is a mix of magnitude (conviction) and trend strength (ADX)
-    # <-- FIX: Use len(BASE_WEIGHTS) for a stable denominator
     num_features = len(BASE_WEIGHTS) if len(BASE_WEIGHTS) > 0 else 1
     conf = (mag / num_features) * 0.8 + adx_bias * 0.2
     

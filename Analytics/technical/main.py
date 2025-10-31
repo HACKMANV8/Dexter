@@ -1,242 +1,249 @@
-# main.py
-# This is the main entry point for the application.
+# File: E:\test2\backend\technical_analyzer\main.py
+# This script will now run index analysis by default.
 
-import time
-import datetime as dt
+import json
 import pandas as pd
-import numpy as np # Keep numpy import as it's a core lib
 
-# --- Local Imports ---
-# Import all configuration variables and ticker lists
-from config import * # Import all helper functions from their respective files
-from utils import is_market_open, get_valid_indicator_count
+# Import all our custom modules (with NO dots)
+from config import NIFTY_50_TICKERS, NIFTY_NEXT_50_TICKERS, SENSEX_30_TICKERS, BASE_WEIGHTS, NIFTY_100_TICKERS
+from utils import is_market_open, prepare_chart_data
 from data_fetch import pull_history
 from indicators import compute_indicators
 from features import normalize_features
 from scoring import adapt_weights, aggregate_score, compute_confidence
-from signals import recommend_signal, smart_stop
+from signals import recommend_signal, smart_stop, interpret_score
 
-
-# -------- MAIN LOOP (polling) ----------
-def run_realtime(poll_interval=POLL_INTERVAL):
-
-    # <-- MODIFIED: Initialize as an empty dict to hold all tickers
-    smoothed_scores = {} 
-    
-    market_status = "OPEN" if is_market_open() else "CLOSED"
-    print(f"Starting realtime technical scorer. Initial market status: {market_status}. Ctrl+C to stop.")
-    
-    # List of technical indicator columns, excluding basic OHLCV
-    INDICATOR_COLS = [c for c in REQUIRED_COLS if c not in ["Close", "High", "Low", "Volume", "RET", "RET_Z", "VOL_Z"]]
-
-    # <-- MODIFIED: Define the list of indices to run
-    indices_to_run = [
-        ("NIFTY 50", NIFTY_50_TICKERS),
-        ("NIFTY NEXT 50", NIFTY_NEXT_50_TICKERS),
-        ("SENSEX 30", SENSEX_30_TICKERS)
-    ]
-
-    while True:
-        try:
-            # --- DYNAMIC PARAMETER SELECTION ---
-            is_open = is_market_open()
-            if is_open:
-                interval = '1m'
-                period = '7d'
-                data_mode = "REAL-TIME (1m)"
-            else:
-                # Use 1 year of daily data for full indicator calculation (SMA200 requires > 200 bars)
-                interval = '1d'
-                period = '1y' 
-                data_mode = "HISTORICAL (1d)"
-
-            # Check if the market status changed since the last poll
-            new_status = "OPEN" if is_open else "CLOSED"
-            if new_status != market_status:
-                print(f"\n[STATUS CHANGE] Market is now {new_status}. Switching to {data_mode} mode.")
-                market_status = new_status
+def analyze_stock(ticker, print_results=True):
+    """
+    Runs the full analysis for a single stock ticker.
+    - PRINTS the results if print_results=True.
+    - RETURNS the key analysis data for aggregation.
+    """
+    try:
+        # --- 1. Get Data for Scoring ---
+        is_open = is_market_open()
+        if is_open:
+            interval = '1m'
+            period = '7d'
+            data_mode = "REAL-TIME (1m)"
+        else:
+            interval = '1d'
+            period = '1y' 
+            data_mode = "HISTORICAL (1d)"
             
-            print("\n" + "~"*85)
-            print(f"CYCLE START: {data_mode} analysis at {dt.datetime.now(MARKET_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-            print("~"*85)
+        if print_results:
+            print(f"\n--- Analyzing {ticker} ({data_mode}) ---")
+        else:
+            # Print a compact version for index analysis
+            print(f"  > Analyzing {ticker}...", end='', flush=True)
 
-            # <-- MODIFIED: Loop through each defined index
-            for index_name, ticker_list in indices_to_run:
-                
-                # <-- MODIFIED: Reset lists for each index
-                results_summary = []
-                data_summary = [] # <-- NEW: List to hold the raw data
-                anomaly_reports = []
-                success_count = 0
-                
-                print(f"\nProcessing {index_name} ({len(ticker_list)} stocks)...")
+        df = pull_history(ticker, interval, period)
 
-                # Iterate through all tickers in the *current* list
-                for i, ticker in enumerate(ticker_list):
-                    print(f"  Processing Ticker {i+1}/{len(ticker_list)}: {ticker}...", end='\r')
-                    
-                    try:
-                        # 1. Fetch data using dynamic parameters
-                        df = pull_history(ticker, interval, period)
-                        
-                        # 2. ISOLATE THE LAST COMPLETE BAR (Core logic to prevent using today's incomplete bar)
-                        df_to_analyze = df.copy()
-                        
-                        # If market is closed AND we have at least 2 bars, discard the last row.
-                        # This logic is mainly for intraday intervals when the market just closed.
-                        if not is_open and interval != '1d' and len(df_to_analyze) >= 2:
-                            df_to_analyze = df_to_analyze.iloc[:-1]
-                        elif len(df_to_analyze) < 1:
-                            # Skip if no data remains
-                            print(f"  {ticker} skipped: No data after pre-analysis.")
-                            continue
-
-                        # 3. Compute indicators on the cleaned or current dataset
-                        df_computed = compute_indicators(df_to_analyze)
-
-                        try:
-                            # This now uses the last available data row regardless of NaNs
-                            features = normalize_features(df_computed)
-                        except Exception as e:
-                            print(f"  {ticker} Failed: Critical Error in feature normalization, skipping: {e}")
-                            continue
-                        
-                        latest_row = df_computed.iloc[-1]
-                        
-                        # DIAGNOSTIC CHECK
-                        valid_count = get_valid_indicator_count(latest_row, INDICATOR_COLS)
-                        
-                        if valid_count < 8: # <— threshold for usable technical context
-                            print(f"  {ticker} skipped: too few valid indicators ({valid_count}).")
-                            continue
-                        
-                        # Ensure features dict gets the latest Z-scores
-                        features["RET_Z"] = latest_row.get("RET_Z", 0)
-                        features["VOL_Z"] = latest_row.get("VOL_Z", 0)
-
-                        weights = BASE_WEIGHTS.copy()
-                        weights = adapt_weights(weights, features, df_computed)
-
-                        score_raw, breakdown = aggregate_score(features, weights)
-                        
-                        # Apply EWMA smoothing
-                        prev_score = smoothed_scores.get(ticker) # <-- MODIFIED: .get() works perfectly with an empty dict
-                        # <-- FIX: Correctly handle None or NaN for initialization
-                        if prev_score is None or pd.isna(prev_score):
-                            smoothed_scores[ticker] = score_raw
-                        else:
-                            smoothed_scores[ticker] = EWMA_ALPHA * score_raw + (1 - EWMA_ALPHA) * prev_score
-
-
-                        confidence = compute_confidence(breakdown, features)
-                        signal = recommend_signal(smoothed_scores[ticker], confidence, latest_row, breakdown)
-                        stop_price = smart_stop(latest_row, signal)
-
-                        # --- BUILD DATA FOR BOTH TABLES ---
-
-                        # 1. Append to Score Table
-                        results_summary.append({
-                            "Ticker": ticker,
-                            "Price": latest_row['Close'],
-                            "Score": smoothed_scores[ticker],
-                            "Conf": confidence,
-                            "Signal": signal,
-                            "Stop": stop_price,
-                            "Trend_Contribution": breakdown.get("SMA_trend", 0.0) + breakdown.get("EMA_trend", 0.0) + breakdown.get("MACD", 0.0)
-                        })
-                        
-                        # 2. Append to Data Table
-                        data_summary.append({
-                            "Ticker": ticker,
-                            "Price": latest_row['Close'],
-                            "Open": latest_row.get('Open', 0.0),
-                            "High": latest_row.get('High', 0.0),
-                            "Low": latest_row.get('Low', 0.0),
-                            "Volume": latest_row.get('Volume', 0),
-                            "%Chg": latest_row.get('RET', 0.0) * 100.0 # Convert return to percentage
-                        })
-                        
-                        success_count += 1
-                        # Note the timestamp of the bar being analyzed (last complete bar)
-                        # <-- FIX: Added safe try/except for strftime
-                        try:
-                            last_bar_time = latest_row.name.strftime('%Y-%m-%d %H:%M:%S')
-                        except AttributeError:
-                            last_bar_time = str(latest_row.name) # Fallback if index isn't datetime
-
-                        print(f"  Processing Ticker {i+1}/{len(ticker_list)}: {ticker}... SUCCESS (Price: {latest_row['Close']:.2f}, Last Bar: {last_bar_time}, Valid Indicators: {valid_count}/{len(INDICATOR_COLS)})")
-                        
-                        # Check for anomalies and store report
-                        if abs(features.get("RET_Z", 0)) > ANOMALY_Z_THRESHOLD:
-                            anomaly_reports.append(f"!!! {ticker} Anomaly: return z-score high: {features['RET_Z']:.2f}")
-                        if abs(features.get("VOL_Z", 0)) > ANOMALY_Z_THRESHOLD:
-                            anomaly_reports.append(f"!!! {ticker} Anomaly: volume z-score high: {features['VOL_Z']:.2f}")
-
-                    except Exception as e:
-                        print(f"  {ticker} Failed: Error processing ticker data ({e}).")
-                        
-                
-                # --- CLEAN OUTPUT GENERATION (FOR THIS INDEX) ---
-                
-                print("\n" + "="*85)
-                print(f"{index_name} COMPLETE: Processed {success_count}/{len(ticker_list)} stocks.")
-                print("="*85)
-
-                if results_summary: # Check if we have *any* data to print
-                    t = dt.datetime.now(MARKET_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S %Z")
-
-                    # --- 1. DATA TABLE ---
-                    df_data = pd.DataFrame(data_summary)
-                    df_data = df_data.sort_values(by='Ticker').reset_index(drop=True)
-                    
-                    print(f"\n[{t}] {index_name} DATA SUMMARY ({data_mode})")
-                    # Adjust width based on columns
-                    print("-"*(len(df_data.columns) * 12)) 
-                    print(df_data.to_string(
-                        index=False,
-                        formatters={
-                            'Price': '{:,.2f}'.format,
-                            'Open': '{:,.2f}'.format,
-                            'High': '{:,.2f}'.format,
-                            'Low': '{:,.2f}'.format,
-                            'Volume': '{:,.0f}'.format, # No decimals for volume
-                            '%Chg': '{:+.2f}'.format   # 2 decimals for % change, with sign
-                        }
-                    ))
-                    print("-"*(len(df_data.columns) * 12))
-
-
-                    # --- 2. SCORE TABLE ---
-                    df_score = pd.DataFrame(results_summary)
-                    df_score = df_score.sort_values(by='Score', ascending=False)
-                    df_score = df_score.drop(columns=['Trend_Contribution']).reset_index(drop=True)
-                    
-                    print(f"\n[{t}] {index_name} TECHNICAL SCOREBOARD ({data_mode} - Sorted by Score)")
-                    print("-"*(len(df_score.columns) * 12 + 10)) 
-                    print(df_score.to_string(index=False, float_format="%.2f")) # Existing format is fine here
-                    print("-"*(len(df_score.columns) * 12 + 10))
-
-                    # --- 3. ANOMALY REPORTS ---
-                    if anomaly_reports:
-                        print(f"\n--- {index_name} ANOMALY REPORTS (High Volatility/Returns) ---")
-                        for report in anomaly_reports:
-                            print(report)
-                        print("-------------------------------------------------")
-                else:
-                    print(f"\n[{dt.datetime.now(MARKET_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z')}] No stocks could be processed for {index_name} in this cycle.")
-
-            # <-- MODIFIED: Sleep only *after* all indices are processed
-            print(f"\nFULL CYCLE COMPLETE. Waiting {poll_interval} seconds...")
-            time.sleep(poll_interval)
+        df_to_analyze = df.copy()
+        if not is_open and interval != '1d' and len(df_to_analyze) >= 2:
+            df_to_analyze = df_to_analyze.iloc[:-1]
         
-        except KeyboardInterrupt:
-            print("\nUser requested stop. Exiting...")
-            break
-        except Exception as e:
-            print(f"FATAL ERROR in main loop: {e}. Restarting loop in {poll_interval}s...")
-            time.sleep(poll_interval)
+        if df_to_analyze.empty:
+            if print_results: print("No data to analyze.")
+            return {"error": "No data to analyze."}
 
+        # --- 2. Compute Score ---
+        df_computed = compute_indicators(df_to_analyze)
+        features = normalize_features(df_computed)
+        latest_row = df_computed.iloc[-1]
+        
+        features["RET_Z"] = latest_row.get("RET_Z", 0)
+        features["VOL_Z"] = latest_row.get("VOL_Z", 0)
 
+        weights = adapt_weights(BASE_WEIGHTS.copy(), features, df_computed)
+        final_score, breakdown = aggregate_score(features, weights)
+        confidence = compute_confidence(breakdown, features)
+        signal = recommend_signal(final_score, confidence, latest_row, breakdown)
+        stop_price = smart_stop(latest_row, signal)
+
+        # --- 3. Print All Results (if specified) ---
+        if print_results:
+            print("\n--- 📊 CURRENT DATA ---")
+            print(f"  Price:  {latest_row['Close']:.2f}")
+            print(f"  Open:   {latest_row.get('Open', 0.0):.2f}")
+            print(f"  High:   {latest_row.get('High', 0.0):.2f}")
+            print(f"  Low:    {latest_row.get('Low', 0.0):.2f}")
+            print(f"  Volume: {latest_row.get('Volume', 0):,.0f}")
+            print(f"  Change: {latest_row.get('RET', 0.0) * 100:+.2f}%")
+            try:
+                bar_time = latest_row.name.strftime('%Y-%m-%d %H:%M:%S')
+                print(f"  Bar Time: {bar_time} ({data_mode})")
+            except Exception:
+                print(f"  Bar Time: {latest_row.name} ({data_mode})")
+
+            print("\n--- 🎯 TECHNICAL ANALYSIS ---")
+            print(f"  Score (0-100):   {final_score:.2f}")
+            print(f"  Interpretation:  {interpret_score(final_score)}")
+            print(f"  Signal:          {signal}")
+            print(f"  Confidence:      {confidence*100:.1f}%")
+            print(f"  Smart Stop:      {stop_price:.2f}")
+
+            print("\n--- ⚠️ IMPORTANT DISCLAIMER ---")
+            print("  This analysis is purely TECHNICAL (based on price, volume, and momentum).")
+            print("  It is NOT fundamental analysis (e.g., P/E, revenue, debt).")
+            print("  'BUY'/'SELL' signals refer to technical indicators, not financial advice.")
+            print("  Do your own research.")
+
+            # --- 6. Fetch, Process, and SAVE Chart Data to JSON File ---
+            print(f"\n📈 Preparing chart data for {ticker}...")
+            
+            try:
+                df_chart_1d = pull_history(ticker, interval='5m', period='1d')
+            except Exception as e:
+                print(f"Could not fetch 1-Day chart data: {e}")
+                df_chart_1d = pd.DataFrame() 
+
+            try:
+                df_chart_1y = pull_history(ticker, interval='1d', period='1y')
+            except Exception as e:
+                print(f"Could not fetch 1-Year chart data: {e}")
+                df_chart_1y = pd.DataFrame()
+                
+            chart_data_dict = prepare_chart_data(ticker, df_chart_1d, df_chart_1y)
+            chart_json = json.dumps(chart_data_dict, indent=2)
+
+            output_filename = f"{ticker}_chart_data.json"
+            try:
+                with open(output_filename, "w") as f:
+                    f.write(chart_json)
+                print(f"\n✅ Successfully saved chart data to: {output_filename}")
+            except Exception as e:
+                print(f"\n❌ Failed to save chart data to file: {e}")
+        
+        # This print is for the index analysis progress
+        if not print_results:
+             print(" Done.")
+
+        # --- 7. Return key data for index aggregation ---
+        return {
+            "score": final_score,
+            "signal": signal
+        }
+
+    except Exception as e:
+        if print_results:
+            print(f"\n❌ An error occurred while analyzing {ticker}: {e}")
+        else:
+            print(f" Error: {e}")
+        return {"error": str(e)}
+
+def analyze_index(ticker_list: list):
+    """
+    Analyzes all stocks in a given list and returns an aggregated score.
+    """
+    valid_stocks = 0
+    total_score = 0
+    signal_counts = { "BUY": 0, "HOLD": 0, "TIGHTEN_STOP": 0, "EXIT": 0, "VIGILANCE_HIGH_VOL": 0, "EXIT_ANOMALY": 0 }
+    total_stocks_in_list = len(ticker_list)
+    
+    for i, ticker in enumerate(ticker_list):
+        print(f"\nAnalyzing {i+1}/{total_stocks_in_list}: ", end='', flush=True)
+        
+        # Call analyze_stock, but tell it NOT to print the full report
+        analysis = analyze_stock(ticker, print_results=False) 
+        
+        if "error" not in analysis:
+            total_score += analysis.get('score', 50)
+            signal = analysis.get('signal', 'HOLD')
+            if signal in signal_counts:
+                signal_counts[signal] += 1
+            else:
+                signal_counts[signal] = 1 # Should not happen, but safe
+            valid_stocks += 1
+        # Error is already printed by analyze_stock
+
+    if valid_stocks == 0:
+        return {"error": "Could not analyze any stocks in the index."}
+
+    average_score = total_score / valid_stocks
+    overall_interpretation = interpret_score(average_score)
+    
+    # Return the final summary
+    return {
+        "total_stocks_in_list": total_stocks_in_list,
+        "total_stocks_analyzed": valid_stocks,
+        "average_score": average_score,
+        "overall_interpretation": overall_interpretation,
+        "signal_distribution": signal_counts
+    }
+
+def print_index_summary(summary, name):
+    """Prints a clean summary for the index analysis."""
+    if "error" in summary:
+        print(f"\n❌ Error analyzing {name}: {summary['error']}")
+        return
+    
+    print("\n" + "="*40)
+    print(f"    {name} - ANALYSIS SUMMARY")
+    print("="*40)
+    print(f"  Stocks Analyzed: {summary['total_stocks_analyzed']} / {summary['total_stocks_in_list']}")
+    print(f"  Average Score:   {summary['average_score']:.2f} / 100")
+    print(f"  Interpretation:  {summary['overall_interpretation']}")
+    print("\n  --- Signal Distribution ---")
+    for signal, count in summary['signal_distribution'].items():
+        if count > 0:
+            print(f"  {signal:<18}: {count}")
+    print("="*40)
+
+# --- THIS IS THE NEW MAIN EXECUTION BLOCK ---
 if __name__ == "__main__":
-    # <-- MODIFIED: No longer passes tickers list
-    run_realtime()
+    
+    # --- 1. DEFAULT ANALYSIS (RUNS ONCE) ---
+    print("="*50)
+    print("   RUNNING DEFAULT INDEX ANALYSIS (NIFTY 50/100, SENSEX)")
+    print("="*50)
+
+    # Run NIFTY 50
+    print("\nAnalyzing NIFTY 50... This will take a moment.")
+    n50_summary = analyze_index(NIFTY_50_TICKERS)
+    print_index_summary(n50_summary, "NIFTY 50")
+
+    # Run NIFTY 100
+    print("\nAnalyzing NIFTY 100... This will take several minutes.")
+    n100_summary = analyze_index(NIFTY_100_TICKERS)
+    print_index_summary(n100_summary, "NIFTY 100")
+
+    # Run SENSEX 30
+    print("\nAnalyzing SENSEX 30... This will take a moment.")
+    sensex_summary = analyze_index(SENSEX_30_TICKERS)
+    print_index_summary(sensex_summary, "SENSEX 30")
+
+    print("\n" + "="*50)
+    print("           DEFAULT ANALYSIS COMPLETE")
+    print("="*50)
+    
+    # --- 2. ON-DEMAND ANALYSIS (LOOPS) ---
+    while True:
+        print("\n" + "="*50)
+        print("         OPTIONAL: ANALYZE A SINGLE STOCK")
+        print("="*50)
+        ticker_input = input("Enter a stock ticker (e.g., RELIANCE.NS) or 'q' to quit: ")
+        
+        if ticker_input.lower() == 'q':
+            print("Exiting...")
+            break # Exit the while loop and the script
+            
+        if not ticker_input:
+            print("Invalid input.")
+            continue # Ask again
+        
+        # Standardize ticker
+        ticker = ticker_input.upper().strip()
+        
+        # Auto-suffixing logic
+        if ".NS" not in ticker and ".BO" not in ticker and not any(c.isdigit() for c in ticker):
+            if ticker in (t.split('.')[0] for t in NIFTY_50_TICKERS) or \
+               ticker in (t.split('.')[0] for t in NIFTY_NEXT_50_TICKERS):
+                 ticker += ".NS"
+                 print(f"(Auto-suffixed to {ticker})")
+            elif ticker in (t.split('.')[0] for t in SENSEX_30_TICKERS):
+                 ticker += ".BO"
+                 print(f"(Auto-suffixed to {ticker})")
+        
+        # Call analyze_stock and tell it to print the full report
+        analyze_stock(ticker, print_results=True)
