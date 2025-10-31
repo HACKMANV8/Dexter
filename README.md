@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Dexter
 # AlphaFusion — AI-Driven Investment Intelligence Platform
 
@@ -65,3 +66,26 @@ AlphaFusion aims to deliver institutional-grade intelligence to retail investors
 
 ## Repository Structure
 
+=======
+Stock Fundamental Analyzer
+
+This project analyzes a list of stocks from the NIFTY 50, NIFTY NEXT 50, and SENSEX 30, providing a fundamental analysis score and a Buy/Hold/Sell recommendation for each.
+
+Setup
+
+Ensure you have Python 3 installed.
+
+Install the required packages:
+
+pip install -r requirements.txt
+
+
+How to Run
+
+Simply run the main.py script from your terminal:
+
+python main.py
+
+
+The script will take several minutes to run as it fetches data for over 100 stocks. It will print a clean report to your console. You can stop it at any time by pressing Ctrl+C.
+>>>>>>> 8d5986b (Initial commit of stock analysis tool)
