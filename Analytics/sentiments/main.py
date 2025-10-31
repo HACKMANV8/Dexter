@@ -1,128 +1,109 @@
 #!/usr/bin/env python3
 """
-AlphaFusion — Full Indian Financial Sentiment (NIFTY100 + Sensex)
+AlphaFusion — Full Indian Financial Sentiment
 
-This is the main entry point for the sentiment analysis application.
-It orchestrates the flow:
-1. Loads constituent data (using caching)
-2. Loads the sentiment analysis model (using GPU if available)
-3. Runs analysis for all companies in parallel
-4. Saves the final sentiment scores to a JSON file
-
-To run this project, navigate to the directory *above* 'sentiments'
-(e.g., your 'AlphaFusion' folder) and run it as a module:
-    
-    python -m sentiments.main
+Main entry point for the sentiment analysis process.
+Run as a module: python -m sentiments.main
 """
 
 import logging
 import concurrent.futures
 import json
+import os
 import time
-from pathlib import Path
 from tqdm import tqdm
 from typing import Dict
 
-# Import from our project's modules using absolute paths
+# --- Core Application Imports ---
+# These are absolute imports from the 'sentiments' package
 from sentiments.data import get_all_index_constituents
 from sentiments.sentiment_analysis import load_sentiment_pipeline, analyze_company
-from sentiments.config import MAX_WORKERS, OUTPUT_PREFIX, CACHE_DIR
+from sentiments import config
 
-# --- Configure Root Logger ---
-# This is the ONLY file where logging.basicConfig() should be called.
+# -----------------------------
+# Logging Setup
+# -----------------------------
+# Set to ERROR to hide all [INFO] and [WARNING] logs
+# You will only see the progress bar and critical failures.
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=logging.ERROR,
+    format="%(asctime)s [%(levelname)s] [%(name)s] - %(message)s",
     handlers=[
-        # You could add logging.FileHandler("app.log") here
-        logging.StreamHandler()
+        logging.FileHandler(f"{config.OUTPUT_PREFIX}.log"), # Still log warnings to a file
+        logging.StreamHandler() # Show ERROR/CRITICAL in terminal
     ]
 )
-logger = logging.getLogger(__name__)
 
-def ensure_directories_exist():
-    """
-    Ensures that all necessary directories (like the cache) exist.
-    """
-    try:
-        Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        logger.error(f"Could not create directory {CACHE_DIR}: {e}")
-        # This is a critical error, as caching will fail.
-        raise
+logger = logging.getLogger(__name__)
 
 def main():
     """
     Main execution function.
     """
     start_time = time.time()
-    logger.info("--- Starting AlphaFusion Sentiment Analysis ---")
-
-    # 1. Setup
-    ensure_directories_exist()
-
-    # 2. Fetch Company Data
-    # This now uses the cached function from data/__init__.py
-    logger.info("Loading constituent data...")
-    all_companies = get_all_index_constituents()
+    logger.info("--- AlphaFusion Sentiment Analysis Started ---")
     
-    if not all_companies:
-        logger.critical("No company data loaded. Check 'data/constituents.py'. Exiting.")
-        return
-        
-    logger.info(f"Loaded {len(all_companies)} unique companies.")
+    # Ensure cache directory exists
+    try:
+        os.makedirs(config.CACHE_DIR, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Failed to create cache directory at {config.CACHE_DIR}: {e}")
+        # This is not fatal, but caching will fail.
 
-    # 3. Load Sentiment Model
-    # This now uses the GPU-aware function from sentiment_analysis/model.py
+    # 1. Fetch company lists (uses cache)
+    logger.info("Fetching all index constituents...")
+    all_companies = get_all_index_constituents()
+    if not all_companies:
+        logger.critical("No companies fetched. Caching might be broken or sources are down. Exiting.")
+        return
+
+    logger.info(f"Total unique companies to analyze: {len(all_companies)}")
+
+    # 2. Load the sentiment model (will auto-select GPU)
     classifier = load_sentiment_pipeline()
     if classifier is None:
         logger.critical("Failed to load sentiment model. Exiting.")
         return
 
-    # 4. Run Parallel Analysis
+    # 3. Run analysis concurrently
     sentiment_dict: Dict[str, float] = {}
     failed_companies: list[str] = []
 
-    logger.info("Starting sentiment analysis...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        # Create a dictionary of {future: ticker}
-        futures = {
-            executor.submit(analyze_company, ticker, name, classifier): ticker
-            for ticker, name in all_companies.items()
-        }
-
-        # Process results as they complete
+    logger.info(f"Starting analysis with {config.MAX_WORKERS} workers...")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
+        # Create a future for each company analysis
+        futures = {executor.submit(analyze_company, ticker, name, classifier): ticker
+                   for ticker, name in all_companies.items()}
+        
+        # Process results as they complete with a TQDM progress bar
         for fut in tqdm(concurrent.futures.as_completed(futures),
                         total=len(futures),
-                        desc="Analyzing Companies"):
-            
+                        desc="Analyzing Companies",
+                        unit="stock"):
             ticker = futures[fut]
             try:
                 res = fut.result()
                 sentiment_dict.update(res)
             except Exception as e:
-                logger.warning(f"Task for {ticker} failed with exception: {e}", exc_info=False)
+                # This will still log, as it's an ERROR
+                logger.error(f"Task for {ticker} generated an unhandled exception: {e}", exc_info=True)
                 failed_companies.append(ticker)
 
-    logger.info("Analysis complete.")
-
-    # 5. Save Results
-    # Use the output prefix from config.py for a dated filename
-    output_file = Path(f"{OUTPUT_PREFIX}.json")
+    # 4. Save final results
+    output_file = f"{config.OUTPUT_PREFIX}.json"
     try:
-        with open(output_file, "w", encoding='utf-8') as f:
+        with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(sentiment_dict, f, indent=2, ensure_ascii=False)
         logger.info(f"Successfully saved results to {output_file}")
     except Exception as e:
-        logger.error(f"Failed to save results to {output_file}: {e}")
-
-    # 6. Final Report
-    if failed_companies:
-        logger.warning(f"Failed to analyze {len(failed_companies)} companies: {failed_companies}")
+        logger.error(f"Failed to save final JSON file to {output_file}: {e}")
 
     end_time = time.time()
-    logger.info(f"--- Total execution time: {end_time - start_time:.2f} seconds ---")
-
+    logger.info(f"--- Analysis Complete in {end_time - start_time:.2f} seconds ---")
+    
+    if failed_companies:
+        logger.warning(f"Failed to get results for {len(failed_companies)} companies: {failed_companies}")
 
 if __name__ == "__main__":
     main()
