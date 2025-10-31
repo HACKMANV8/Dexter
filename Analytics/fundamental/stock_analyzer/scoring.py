@@ -1,10 +1,7 @@
-# stock_analyzer/scoring.py
-# This file's only job is to define the scoring rules.
-
 import pandas as pd
 import numpy as np
 
-# ---------- Scoring and recommendation (unchanged logic) ----------
+# ---------- Scoring and recommendation ----------
 def _hib_normalize(val, good, excellent):
     """Higher is Better (HIB) normalization"""
     if pd.isna(val):
@@ -39,7 +36,6 @@ def score_fundamentals(metrics):
     pe_s = _lib_normalize(metrics['P/E'], fair=50, excellent=15)
     pb_s = _lib_normalize(metrics['P/B'], fair=10, excellent=1.5)
     ps_s = _lib_normalize(metrics['P/S'], fair=6, excellent=1.5)
-    # Handle NaN/negative PEG
     peg_val = metrics['PEG']
     if pd.isna(peg_val) or peg_val <= 0:
         peg_val = 999 # Treat as very high (bad)
@@ -60,8 +56,7 @@ def score_fundamentals(metrics):
 
     # Growth
     epsg_s = _hib_normalize(metrics['EPS_Growth_pct'], good=10, excellent=25)
-    # FIX: Adjusted for more realistic FCF/share values (now that it's correctly calculated)
-    fcf_s = _hib_normalize(metrics['FCF_per_share'], good=30, excellent=70) # Adjusted for INFY.NS example
+    fcf_s = _hib_normalize(metrics['FCF_per_share'], good=30, excellent=70)
     growth_score = np.nanmean([epsg_s, fcf_s])
 
     composite = val_score * 0.30 + prof_score * 0.30 + health_score * 0.20 + growth_score * 0.20

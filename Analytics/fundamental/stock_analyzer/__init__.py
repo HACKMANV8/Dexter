@@ -1,4 +1,4 @@
-# stock_analyzer/__init__.py
-# This makes 'stock_analyzer' a package.
-# We also "expose" the main function so we can import it easily.
-from .analysis import analyze_ticker
+from .analysis import FundamentalAnalyzer, analyze_ticker
+from .fetcher import fetch_financial_data
+
+__all__ = ['FundamentalAnalyzer', 'analyze_ticker', 'fetch_financial_data']

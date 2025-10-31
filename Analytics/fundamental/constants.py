@@ -1,5 +1,14 @@
-# constants.py
-# This file holds static lists of stock tickers.
+# fundamental_analyzer_yf.py
+import pandas as pd
+import numpy as np
+import yfinance as yf
+import math
+import json  # --- NEW ---: Imported for JSON output
+from typing import Optional, List
+
+# ----------------------------
+# Fundamental Analyzer using yfinance (improved)
+# ----------------------------
 
 NIFTY_50 = [
     "ADANIENT.NS", "ADANIPORTS.NS", "APOLLOHOSP.NS", "ASIANPAINT.NS", "AXISBANK.NS",
@@ -36,6 +45,25 @@ SENSEX_30 = [
     "TECHM.NS", "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS"
 ]
 
-# Combine all lists and remove duplicates
-all_tickers = set(NIFTY_50 + NIFTY_NEXT_50 + SENSEX_30)
-tickers_to_test = sorted(list(all_tickers)) # Run on all unique stocks
+# --- Candidate lists for fetching ---
+
+# Annual Candidates
+NET_INCOME_CANDS = [
+    'Net Income', 'Net Income Common Stockholders', 'Net Income Applicable To Common Shares',
+    'NetIncome', 'NetIncomeLoss'
+]
+REVENUE_CANDS = ['Total Revenue', 'Revenue', 'Net sales', 'totalRevenue', 'RevenueNet']
+TOTAL_ASSETS_CANDS = ['Total Assets', 'totalAssets']
+TOTAL_LIAB_CANDS = ['Total Liab', 'Total Liabilities', 'totalLiab', 'Total Liabilities Net Minority Interest']
+EQUITY_CANDS = ['Total Stockholder Equity', 'Total Shareholders\' Equity', 'totalStockholderEquity', 'Total stockholders\' equity', 'stockholdersEquity', 'Stockholders Equity']
+LONG_TERM_DEBT_CANDS = ['Long Term Debt', 'longTermDebt', 'Non Current Debt']
+CURRENT_DEBT_CANDS = ['Current Debt', 'shortTermDebt', 'Short Term Debt', 'Current Debt And Capital Lease Obligation']
+TOTAL_DEBT_CANDS_OLD = ['Total Debt', 'TotalDebt', 'Total debt'] # Fallback
+EBIT_CANDS = ['Ebit', 'EBIT', 'Operating Income', 'OperatingIncomeLoss', 'operatingIncome']
+INTEREST_EXP_CANDS = ['Interest Expense', 'interestExpense']
+OP_CASH_CANDS = ['Total Cash From Operating Activities', 'Total cash from operating activities', 'Net Cash Provided by Operating Activities', 'Total Cash From Operating Activities', 'operatingCashflow']
+CAPEX_CANDS = ['Capital Expenditures', 'capitalExpenditures']
+
+# Quarterly Candidates
+SHARES_ISSUED_CANDS = ['Share Issued', 'Common Stock', 'sharesIssued']
+ASSET_ACQ_CANDS = ['Acquisitions Net', 'Purchase Of Business', 'Purchase Of Ppe', 'Purchase Of Investment']

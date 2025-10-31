@@ -1,39 +1,110 @@
-# main.py
-# This is the main entry point for the program.
-# To run: python main.py
+import json
+import pandas as pd
+import numpy as np
 
-# Import the main analysis function from our package
-from stock_analyzer import analyze_ticker
-# Import the list of tickers from our constants file
-from constants import tickers_to_test
+# Use the __init__.py to import the main class
+from stock_analyzer import FundamentalAnalyzer
 
+# --- JSON Cleaning Helpers ---
+def clean_value(v):
+    """Converts numpy/pandas NaN to None, and numpy numbers to python numbers."""
+    if pd.isna(v):
+        return None
+    if isinstance(v, (np.int64, np.int32)):
+        return int(v)
+    if isinstance(v, (np.float64, np.float32)):
+        return float(v)
+    return v
+
+def clean_dict(d):
+    """Recursively clean a dict of numpy types and NaNs."""
+    if not isinstance(d, dict):
+        return clean_value(d)
+    
+    new_dict = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            new_dict[k] = clean_dict(v)
+        else:
+            new_dict[k] = clean_value(v)
+    return new_dict
+
+# --- Main execution block ---
 if __name__ == '__main__':
     
-    print("--- Fundamental Analysis Score Report ---")
-    print(f"Analyzing {len(tickers_to_test)} unique stocks from NIFTY 50, NIFTY NEXT 50, and SENSEX 30...")
-    print("This will take several minutes. Press Ctrl+C to stop.")
-    print(f"\n{'Stock':<15} | {'Score':<10} | {'Recommendation'}")
-    print("-" * 60)
-
-    # Added try/except KeyboardInterrupt to allow user to stop the script
-    try:
-        for ticker in tickers_to_test:
-            try:
-                # We run the full analysis, but will only print the final results
-                # Set index_compare to None to speed it up.
-                out = analyze_ticker(ticker, index_compare=None)
-                
-                stock_name = out['Ticker']
-                final_score = out['Scores']['Composite_Score']
-                recommendation = out['Recommendation']
-                
-                print(f"{stock_name:<15} | {final_score:<10.2f} | {recommendation}")
-
-            except Exception as e:
-                print(f"Could not analyze {ticker}: {str(e)[:50]}...") # Print truncated error
+    # 1. Ask for stock name
+    ticker_input = input("Enter stock name (e.g., RELIANCE.NS): ")
     
-    except KeyboardInterrupt:
-        print("\n--- Analysis stopped by user ---")
+    if not ticker_input:
+        print("No ticker provided. Exiting.")
+    else:
+        try:
+            print(f"Analyzing {ticker_input}...")
+            
+            # 2. Run the analysis
+            fa = FundamentalAnalyzer(ticker_input)
+            all_metrics = fa.calculate_all_metrics() # For calculated ratios
+            raw_data = fa.data                      # For raw historical data
+            
+            # 3. Build the specific dictionary you requested
+            
+            # Market Cap
+            market_cap = raw_data['Stock_Price'] * raw_data['Shares_Outstanding']
+            
+            # Current Debt
+            current_debt = raw_data['Total_Debt_Annual'].get('P0')
+            
+            # Current Assets
+            current_assets = raw_data['Total_Assets_Annual'].get('P0')
+            
+            # Debt on Equity (D/E Ratio)
+            debt_on_equity = all_metrics.get('Debt_to_Equity')
+            
+            # Debt on Assets (D/A Ratio)
+            debt_on_assets = all_metrics.get('Debt_to_Asset_T')
+            
+            # Owner Equity (Total Stockholder Equity)
+            owner_equity = raw_data['Shareholders_Equity_Annual'].get('P0')
+            
+            # 3-Year Debt Analysis
+            debt_analysis_3y = {
+                'Year_T': raw_data['Total_Debt_Annual'].get('P0'),
+                'Year_T_1': raw_data['Total_Debt_Annual'].get('P1'),
+                'Year_T_2': raw_data['Total_Debt_Annual'].get('P2')
+            }
+            
+            # 3-Year Profit Analysis
+            profit_analysis_3y = {
+                'Year_T': raw_data['Net_Income_Annual'].get('P0'),
+                'Year_T_1': raw_data['Net_Income_Annual'].get('P1'),
+                'Year_T_2': raw_data['Net_Income_Annual'].get('P2')
+            }
+            
+            # Assemble final JSON object
+            json_output = {
+                'Stock': ticker_input,
+                'Market_Cap': market_cap,
+                'Current_Debt': current_debt,
+                'Current_Assets': current_assets,
+                'Debt_on_Equity_Ratio': debt_on_equity,
+                'Debt_on_Assets_Ratio': debt_on_assets,
+                'Owner_Equity': owner_equity,
+                'Debt_Analysis_Last_3_Years': debt_analysis_3y,
+                'Profit_Analysis_Last_3_Years': profit_analysis_3y
+            }
+            
+            # Clean the dict of np.nan and numpy types for clean JSON
+            json_output_clean = clean_dict(json_output)
+            
+            # 4. Write to JSON file
+            filename = f"{ticker_input.replace('.', '_')}.json"
+            
+            with open(filename, 'w') as f:
+                json.dump(json_output_clean, f, indent=4)
+                
+            # 5. Output only the success message
+            print(f"Success: JSON file created at {filename}")
 
-    print("-" * 60)
-    print("Score Legend: 80+ (Strong Buy), 65+ (Buy), 50+ (Hold), 35+ (Reduce), <35 (Strong Sell)")
+        except Exception as e:
+            # Output only the error message
+            print(f"Error: Could not analyze {ticker_input}. Reason: {e}")
