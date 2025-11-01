@@ -1,7 +1,6 @@
-import { useState } from "react";
-import Header from "@/components/Header";
+import React, { useState } from "react";
+// Removed external imports like Header and cn (utility functions)
 import { Search, Brain, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // 50 mock stocks
 const mockStocks = [
@@ -57,6 +56,22 @@ const mockStocks = [
   { symbol: "HINDALCO", name: "Hindalco Industries", price: 482.95, sentiment: 86, technical: 81, fundamental: 90, overall: 86, recommendation: 'buy' },
 ];
 
+// Placeholder for the Header component (since external imports are not allowed)
+const Header = () => (
+  <header className="sticky top-0 z-10 w-full backdrop-blur-md bg-gray-950/70 border-b border-gray-800/50">
+    <div className="max-w-screen-2xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div className="text-2xl font-bold text-white flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">α</div>
+        Fusion Analysis
+      </div>
+      <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center">
+        U
+      </div>
+    </div>
+  </header>
+);
+
+
 export default function SearchPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredStocks, setFilteredStocks] = useState(mockStocks);
@@ -75,45 +90,100 @@ export default function SearchPage() {
     }
   };
 
+  // --- Style Mapping Functions ---
+  // Using concrete Tailwind classes to replace abstract theme names (secondary, chart-4, destructive)
   const getScoreColor = (score) => {
-    if (score >= 75) return "text-secondary";
-    if (score >= 50) return "text-chart-4";
-    return "text-destructive";
+    if (score >= 75) return "text-green-400"; // Replaces text-secondary
+    if (score >= 50) return "text-yellow-400"; // Replaces text-chart-4
+    return "text-red-400"; // Replaces text-destructive
+  };
+
+  const getBarColor = (score) => {
+    if (score >= 75) return "bg-green-600";
+    if (score >= 50) return "bg-yellow-600";
+    return "bg-red-600";
   };
 
   const getRecommendationColor = (rec) => {
-    if (rec === 'buy') return "bg-secondary/20 text-secondary border-secondary/30";
-    if (rec === 'hold') return "bg-chart-4/20 text-chart-4 border-chart-4/30";
-    return "bg-destructive/20 text-destructive border-destructive/30";
+    if (rec === 'buy') return "bg-green-600/20 text-green-400 border-green-600/30";
+    if (rec === 'hold') return "bg-yellow-600/20 text-yellow-400 border-yellow-600/30";
+    return "bg-red-600/20 text-red-400 border-red-600/30";
   };
+  // --- End Style Mapping Functions ---
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-black animate-fade-in">
-      <Header />
+    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
+        
+      {/* Custom Styles from the main theme for consistency */}
+      <style>{`
+        /* Define color variables */
+        :root {
+            --primary-light: 217 91% 60%; /* Blue */
+            --secondary-light: 271 70% 60%; /* Purple */
+        }
+        /* Match the deep background color */
+        .bg-gray-950 { background-color: #080a13; }
+        
+        /* Match the main title gradient */
+        .gradient-text {
+          background-image: linear-gradient(90deg, hsl(var(--primary-light)), hsl(var(--secondary-light)));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          text-fill-color: transparent;
+        }
+        /* Match the glass effect from the main app's modal/cards */
+        .glass { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            transition: all 0.3s ease;
+        }
+        .glow-violet:hover {
+            box-shadow: 0 0 15px rgba(124, 58, 237, 0.7), 0 0 30px rgba(124, 58, 237, 0.4);
+        }
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.5s ease-out forwards;
+        }
+        .bg-card { background-color: rgba(30, 41, 59, 0.7); } /* Custom background for score bars */
+        .text-muted-foreground { color: #9ca3af; } /* Gray-400 equivalent */
+        .text-primary { color: #60a5fa; } /* Blue-400 equivalent */
+      `}</style>
+
+      {/* Placeholder Header */}
+      <Header /> 
+      
       <div className="p-8 space-y-8 max-w-screen-lg mx-auto">
         {/* Search Header */}
         <div className="text-center space-y-4 animate-slide-up">
           <div className="inline-block p-4 rounded-2xl glass glow-violet">
-            <Brain className="w-12 h-12 text-primary" />
+            <Brain className="w-12 h-12 text-blue-400" /> {/* Changed text-primary to text-blue-400 */}
           </div>
-          <h1 className="text-4xl font-bold gradient-text">AI-Powered Stock Search</h1>
+          <h1 className="text-4xl font-bold gradient-text">Investment Discovery</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Discover investment opportunities analyzed through sentiment, technical, and fundamental metrics
           </p>
         </div>
+        
         {/* Search Bar */}
         <div className="max-w-3xl mx-auto animate-slide-up" style={{ animationDelay: '0.1s' }}>
           <div className="relative glass rounded-2xl p-2 glow-violet">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /> {/* Changed text-muted-foreground to text-gray-400 */}
             <input
               type="text"
               placeholder="Search stocks by name or symbol..."
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
-              className="w-full bg-transparent px-14 py-4 text-lg outline-none"
+              className="w-full bg-transparent px-14 py-4 text-lg outline-none text-white placeholder-gray-500"
             />
           </div>
         </div>
+        
         {/* Stock Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
           {filteredStocks.map((stock, index) => (
@@ -124,92 +194,84 @@ export default function SearchPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-2xl font-bold">{stock.symbol}</h3>
-                  <p className="text-sm text-muted-foreground">{stock.name}</p>
+                  <h3 className="text-2xl font-bold text-white">{stock.symbol}</h3>
+                  <p className="text-sm text-gray-400">{stock.name}</p> {/* Changed text-muted-foreground to text-gray-400 */}
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold">₹{stock.price.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-blue-400">₹{stock.price.toLocaleString()}</p>
                   <span
-                    className={cn(
-                      "inline-block mt-1 px-3 py-1 rounded-full text-xs font-semibold border uppercase",
-                      getRecommendationColor(stock.recommendation)
-                    )}
+                    className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-semibold border uppercase ${getRecommendationColor(stock.recommendation)}`}
                   >
                     {stock.recommendation}
                   </span>
                 </div>
               </div>
+              
               {/* Score Bars */}
               <div className="space-y-4">
+                {/* Sentiment Score */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <TrendingUp className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                      <TrendingUp className="w-4 h-4 text-white" />
                       <span>Sentiment Score</span>
                     </div>
-                    <span className={cn("font-bold", getScoreColor(stock.sentiment))}>
+                    <span className={`font-bold ${getScoreColor(stock.sentiment)}`}>
                       {stock.sentiment}%
                     </span>
                   </div>
                   <div className="h-2 bg-card rounded-full overflow-hidden">
                     <div
-                      className={cn(
-                        "h-full transition-all duration-500 rounded-full",
-                        stock.sentiment >= 75 ? "bg-secondary" :
-                        stock.sentiment >= 50 ? "bg-chart-4" : "bg-destructive"
-                      )}
+                      className={`h-full transition-all duration-500 rounded-full ${getBarColor(stock.sentiment)}`}
                       style={{ width: `${stock.sentiment}%` }}
                     />
                   </div>
                 </div>
+                
+                {/* Technical Score */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <AlertCircle className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                      <AlertCircle className="w-4 h-4 text-white" />
                       <span>Technical Score</span>
                     </div>
-                    <span className={cn("font-bold", getScoreColor(stock.technical))}>
+                    <span className={`font-bold ${getScoreColor(stock.technical)}`}>
                       {stock.technical}%
                     </span>
                   </div>
                   <div className="h-2 bg-card rounded-full overflow-hidden">
                     <div
-                      className={cn(
-                        "h-full transition-all duration-500 rounded-full",
-                        stock.technical >= 75 ? "bg-secondary" :
-                        stock.technical >= 50 ? "bg-chart-4" : "bg-destructive"
-                      )}
+                      className={`h-full transition-all duration-500 rounded-full ${getBarColor(stock.technical)}`}
                       style={{ width: `${stock.technical}%` }}
                     />
                   </div>
                 </div>
+                
+                {/* Fundamental Score */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <DollarSign className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                      <DollarSign className="w-4 h-4 text-white" />
                       <span>Fundamental Score</span>
                     </div>
-                    <span className={cn("font-bold", getScoreColor(stock.fundamental))}>
+                    <span className={`font-bold ${getScoreColor(stock.fundamental)}`}>
                       {stock.fundamental}%
                     </span>
                   </div>
                   <div className="h-2 bg-card rounded-full overflow-hidden">
                     <div
-                      className={cn(
-                        "h-full transition-all duration-500 rounded-full",
-                        stock.fundamental >= 75 ? "bg-secondary" :
-                        stock.fundamental >= 50 ? "bg-chart-4" : "bg-destructive"
-                      )}
+                      className={`h-full transition-all duration-500 rounded-full ${getBarColor(stock.fundamental)}`}
                       style={{ width: `${stock.fundamental}%` }}
                     />
                   </div>
                 </div>
               </div>
+              
               {/* Overall Score */}
-              <div className="mt-6 pt-4 border-t border-white/10">
+              <div className="mt-6 pt-4 border-t border-gray-700">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Overall Investment Score</span>
-                  <span className={cn("text-3xl font-bold", getScoreColor(stock.overall))}>
+                  <span className="text-lg font-bold text-gray-300">Overall Investment Score (Alpha Fusion)</span>
+                  <span className={`text-4xl font-extrabold ${getScoreColor(stock.overall)}`}>
                     {stock.overall}
                   </span>
                 </div>
