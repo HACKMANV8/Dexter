@@ -1,45 +1,8 @@
-import { useState, useEffect } from "react";
-// Import ScatterChart for the wick visualization, as it's the best component for plotting single points
-import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter } from "recharts";
-import { ArrowUpRight, Activity, TrendingUp, TrendingDown, DollarSign, Zap } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import { ArrowUpRight, Activity, TrendingUp, DollarSign, Zap } from "lucide-react";
 
 // --- Mock Data Generation ---
-
-/**
- * Generates Candlestick data (open, close, high, low) from time-series value data.
- * NOTE: This function remains for potential future use, but the main chart now uses raw value data.
- */
-const generateCandleData = (data) => {
-    return data.map((d, i) => {
-        // Use the previous day's close as today's open, with some slight variance
-        const open = i > 0 ? data[i - 1].value + (Math.random() * 50 - 25) : d.value - 100;
-        const close = d.value;
-        
-        // Calculate the range for high and low based on the open/close span
-        const minVal = Math.min(open, close);
-        const maxVal = Math.max(open, close);
-
-        const high = maxVal + Math.random() * 80;
-        const low = minVal - Math.random() * 80;
-
-        // Determine if it's a green (up) or red (down) candle
-        const isBullish = close >= open;
-        
-        return {
-            date: d.date,
-            fullDate: d.fullDate,
-            volume: d.volume,
-            low: Math.floor(low),
-            high: Math.floor(high),
-            open: Math.floor(open),
-            close: Math.floor(close),
-            wickBelow: Math.min(open, close) - Math.floor(low),
-            bodySize: Math.abs(open - close),
-            isBullish,
-        };
-    });
-};
-
 
 const generateChartData = (days, baseValue, volatility = 500, trendFactor = 50) =>
   Array.from({ length: days }, (_, i) => {
@@ -54,20 +17,24 @@ const generateChartData = (days, baseValue, volatility = 500, trendFactor = 50) 
     };
   });
 
-// Generate 1 year (365 days) worth of base data
+// Generate 1 year (365 days) worth of base data (NIFTY 50 baseline)
 const fullValueData = generateChartData(365, 20000, 500, 50);
-const fullCandleData = generateCandleData(fullValueData); // This is kept but not used by main chart
 
-// --- Static Data ---
+// --- Static Data & Factors ---
 
+// UPDATED: Removed NASDAQ, S&P 500, and DOW JONES
 const marketIndices = [
   { name: "NIFTY 50", symbol: "^NSEI", price: 21453.65, change: 234.5, changePercent: 1.1 },
   { name: "SENSEX", symbol: "^BSESN", price: 71431.43, change: 512.3, changePercent: 0.72 },
-  { name: "NASDAQ", symbol: "^IXIC", price: 15643.12, change: -23.45, changePercent: -0.15 },
-  { name: "DOW JONES", symbol: "^DJI", price: 37234.89, change: 156.78, changePercent: 0.42 },
   { name: "NIFTY BANK", symbol: "^NSEBANK", price: 45234.56, change: 389.23, changePercent: 0.87 },
-  { name: "S&P 500", symbol: "^GSPC", price: 4783.23, change: 45.12, changePercent: 0.95 },
 ];
+
+// UPDATED: Removed factors for the removed international indices
+const symbolFactors = {
+    '^NSEI': { factor: 1.0, volatility: 300, trendOffset: 0 },
+    '^BSESN': { factor: 0.95, volatility: 250, trendOffset: 500 },
+    '^NSEBANK': { factor: 1.2, volatility: 500, trendOffset: -2000 },
+};
 
 const sectorData = [
   { sector: "IT", performance: 2.5, value: 25 },
@@ -104,17 +71,24 @@ const topLosers = [
 
 // --- Sub-Components ---
 
-// Mock Component for Market Index Card
-const StockCard = ({ name, symbol, price, change, changePercent }) => {
+/**
+ * Mock Component for Market Index Card
+ * UPDATED: Uses the new selectedPrimaryIndex state
+ */
+const StockCard = ({ name, symbol, price, change, changePercent, onSelect, isSelected }) => {
   const isPositive = changePercent >= 0;
   const colorClass = isPositive ? 'text-secondary' : 'text-destructive';
-  const icon = isPositive ? ArrowUpRight : ArrowUpRight;
+  const IconComponent = ArrowUpRight; 
 
   return (
-    <div className="group glass-sm rounded-2xl p-4 hover:ring-2 ring-primary/50 transition-all duration-300 transform hover:scale-[1.02]">
+    <div 
+      className={`group glass-sm rounded-2xl p-4 transition-all duration-300 transform hover:scale-[1.02] cursor-pointer 
+        ${isSelected ? 'ring-2 ring-primary/80' : 'hover:ring-2 ring-primary/50'}`}
+      onClick={() => onSelect(symbol)}
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold truncate">{name}</h3>
-        <icon className={`w-5 h-5 ${colorClass} ${!isPositive ? 'rotate-180' : ''}`} />
+        <IconComponent className={`w-5 h-5 ${colorClass} ${!isPositive ? 'rotate-180' : ''}`} />
       </div>
       <p className="text-2xl font-bold mt-1">₹{price.toLocaleString()}</p>
       <div className="flex items-center gap-2 mt-1">
@@ -152,22 +126,14 @@ const Header = () => (
         AlphaFusion
       </div>
       <div className="flex items-center gap-4">
-        <button className="p-2 rounded-full hover:bg-muted transition-colors">
-          <Activity className="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button className="p-2 rounded-full hover:bg-muted transition-colors">
-          <DollarSign className="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button className="w-8 h-8 rounded-full bg-primary text-primary-foreground font-semibold flex items-center justify-center">
-          U
-        </button>
+        {/* Empty on the right */}
       </div>
     </div>
   </header>
 );
 
 // New component for the Line/Area Chart with points joined by a line
-const PriceLineChart = ({ data }) => {
+const PriceLineChart = ({ data, mainIndexName }) => {
     return (
         <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
@@ -189,7 +155,7 @@ const PriceLineChart = ({ data }) => {
                 />
                 <Tooltip
                     labelFormatter={(label) => `Date: ${label}`}
-                    formatter={(value) => [`₹${Math.floor(value).toLocaleString()}`, 'Price']}
+                    formatter={(value) => [`₹${Math.floor(value).toLocaleString()}`, mainIndexName]}
                     contentStyle={{
                         background: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
@@ -225,6 +191,8 @@ const PriceLineChart = ({ data }) => {
 export default function App() {
   const [selectedPeriod, setSelectedPeriod] = useState('1M');
   const [liveUpdate, setLiveUpdate] = useState(0);
+  // Tracks the currently selected index for the primary chart and comparison chart
+  const [selectedPrimaryIndex, setSelectedPrimaryIndex] = useState('^NSEI'); // Default to NIFTY 50
 
   // Live update simulation
   useEffect(() => {
@@ -234,64 +202,104 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Function to filter data based on selected period and add mock SENSEX data
-  const getFilteredDataSlice = (dataToSlice) => {
-    let days;
-    switch (selectedPeriod) {
-      case '1D': days = 10; break;
-      case '1W': days = 7; break;
-      case '1M': days = 30; break;
-      case '3M': days = 90; break;
-      case '6M': days = 180; break;
-      case '1Y': days = 365; break;
-      case 'MAX': days = dataToSlice.length; break;
-      default: days = 30; break;
+  // Calculate the number of days for the selected period
+  const getDaysForPeriod = (period) => {
+    switch (period) {
+      case '1D': return 10;
+      case '1W': return 7;
+      case '1M': return 30;
+      case '3M': return 90;
+      case '6M': return 180;
+      case '1Y': return 365;
+      case 'MAX': return fullValueData.length;
+      default: return 30;
     }
-    const slicedData = dataToSlice.slice(-days);
-    
-    // Add mocked SENSEX data to the sliced NIFTY data
-    return slicedData.map(d => ({
-        ...d,
-        // Mock SENSEX to be ~5% lower than NIFTY and slightly less volatile
-        sensexValue: Math.floor(d.value * 0.95 + (Math.random() * 100))
-    }));
   };
 
-  // Use the simple value data for the main chart now
-  const currentPriceData = getFilteredDataSlice(fullValueData);
 
-  // Map the volume data from the same slice
-  const currentVolumeData = currentPriceData.map(d => ({
+  // Centralized data calculation using useMemo
+  const currentMainData = useMemo(() => {
+    const days = getDaysForPeriod(selectedPeriod);
+    const slicedData = fullValueData.slice(-days);
+    
+    // Ensure the selected index still exists after filtering. If not, default to NIFTY 50.
+    const validPrimaryIndex = marketIndices.find(i => i.symbol === selectedPrimaryIndex) ? selectedPrimaryIndex : '^NSEI';
+    
+    const selectedFactor = symbolFactors[validPrimaryIndex] || symbolFactors['^NSEI'];
+    const selectedIndexInfo = marketIndices.find(i => i.symbol === validPrimaryIndex) || marketIndices[0];
+
+    // UPDATED LOGIC: If primary index is SENSEX, compare against NIFTY 50. Otherwise, compare against SENSEX.
+    const comparisonSymbol = validPrimaryIndex === '^BSESN' ? '^NSEI' : '^BSESN'; 
+    const comparisonFactor = symbolFactors[comparisonSymbol];
+    const comparisonIndexInfo = marketIndices.find(i => i.symbol === comparisonSymbol);
+
+
+    const getPrice = (factor, d) => {
+         const baseValue = d.value * factor.factor;
+         const noise = (Math.random() - 0.5) * (factor.volatility || 0);
+         const trendOffset = factor.trendOffset || 0;
+         return Math.floor(baseValue + noise + trendOffset);
+    };
+
+    return slicedData.map((d) => {
+        return {
+            date: d.date,
+            fullDate: d.fullDate,
+            volume: d.volume,
+            // Data for the main Area Chart (uses the selected index)
+            mainPrice: getPrice(selectedFactor, d),
+            mainName: selectedIndexInfo.name,
+            
+            // Data for the comparison chart
+            comparisonPrice: getPrice(comparisonFactor, d),
+            comparisonName: comparisonIndexInfo.name,
+
+            // NIFTY 50 reference data (used in comparison chart if selectedPrimaryIndex is not NIFTY 50)
+            niftyValue: getPrice(symbolFactors['^NSEI'], d),
+        };
+    });
+  }, [selectedPeriod, selectedPrimaryIndex, liveUpdate]); // Rerun when period or selected index changes
+
+  // Data structure for the Area Chart (Main Chart)
+  const mainAreaChartData = currentMainData.map(d => ({
     date: d.date,
-    volume: d.volume,
+    value: d.mainPrice, // Dynamically selected index price
   }));
+  
+  // Data structure for the Volume Chart (using volume from the base NIFTY data slice)
+  const currentVolumeData = currentMainData.map(d => ({ 
+    date: d.date, 
+    fullDate: d.fullDate, 
+    volume: d.volume 
+  }));
+  
+  // Dynamic labels for display
+  const mainIndexName = currentMainData.length > 0 ? currentMainData[0].mainName : 'NIFTY 50';
+  const comparisonIndexName = currentMainData.length > 0 ? currentMainData[0].comparisonName : 'SENSEX';
+
+  const lastClosePrice = currentMainData.length > 0 ? currentMainData[currentMainData.length - 1].mainPrice : 0;
   const chartXAxisKey = selectedPeriod === '1D' ? 'fullDate' : 'date';
 
-  // Last price needs to come from the line chart data now.
-  const lastClosePrice = currentPriceData.length > 0 ? currentPriceData[currentPriceData.length - 1].value : 0;
-  
   // Tailwind Utility Classes for Card Look (Darker background)
   const GlassCardStyles = "bg-slate-800/50 backdrop-blur-md rounded-2xl border border-gray-700/50 shadow-xl";
   const GlassCardStylesSm = "bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/30 shadow-md";
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
-      {/* Updated Styles for a Dark Theme */}
       <style>{`
         :root {
-          --primary: 222.2 47.4% 100%; /* For headers, primary actions - White */
-          --secondary: 142.1 70.6% 45.3%; /* Green for gains/bullish */
-          --destructive: 0 72.2% 50.6%; /* Red for losses/bearish */
+          --primary: 222.2 47.4% 100%; /* White */
+          --secondary: 142.1 70.6% 45.3%; /* Green */
+          --destructive: 0 72.2% 50.6%; /* Red */
           --background: 222.2 47.4% 11.2%; /* Deep background */
           --card: 222.2 47.4% 14.2%; /* Card background */
           --border: 222.2 47.4% 20%;
-          --muted-foreground: 222.2 47.4% 65%; /* Light gray text */
-          --primary-foreground: 222.2 47.4% 10%; /* Dark text on primary */
+          --muted-foreground: 222.2 47.4% 65%;
+          --primary-foreground: 222.2 47.4% 10%;
         }
         .bg-gray-950 { background-color: hsl(222.2 47.4% 8%); }
         .glass { ${GlassCardStyles} }
         .glass-sm { ${GlassCardStylesSm} }
-        /* Simple animation styles */
         @keyframes slide-up {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
@@ -324,25 +332,30 @@ export default function App() {
           </div>
         </section>
 
-        {/* Market Indices */}
+        {/* Market Indices (The Interactive Cards) */}
         <section className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-white">
             <Activity className="w-6 h-6 text-primary" />
             Market Overview
             <span className="ml-2 px-3 py-1 text-xs rounded-full bg-secondary/20 text-secondary font-semibold animate-pulse">LIVE</span>
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
             {marketIndices.map((index) => (
-              <StockCard key={index.symbol} {...index} />
+              <StockCard 
+                key={index.symbol} 
+                {...index} 
+                onSelect={setSelectedPrimaryIndex}
+                isSelected={index.symbol === selectedPrimaryIndex}
+              />
             ))}
           </div>
         </section>
 
-        {/* Main Price Line Chart with Volume */}
+        {/* Main Price Area Chart with Volume (DYNAMICALLY SELECTED INDEX) */}
         <section className={`${GlassCardStyles} p-6 animate-slide-up`} style={{ animationDelay: '0.2s' }}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-white">NIFTY 50 Price Action</h2>
+              <h2 className="text-2xl font-bold text-white">{mainIndexName} Price Action</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Data Period: {selectedPeriod} • Last Close: ₹{Math.floor(lastClosePrice).toLocaleString()}
               </p>
@@ -363,10 +376,10 @@ export default function App() {
             </div>
           </div>
           
-          {/* Main Price Line Chart */}
-          <PriceLineChart data={currentPriceData} />
+          {/* Main Price Area Chart (Uses the selected index data) */}
+          <PriceLineChart data={mainAreaChartData} mainIndexName={mainIndexName} />
 
-          {/* Volume Chart Below */}
+          {/* Volume Chart Below (Uses NIFTY 50 volume as proxy) */}
           <div className="mt-6 pt-6 border-t border-border/70">
             <h3 className="text-sm font-semibold mb-4 text-muted-foreground">Trading Volume ({selectedPeriod})</h3>
             <ResponsiveContainer width="100%" height={100}>
@@ -389,9 +402,8 @@ export default function App() {
           </div>
         </section>
 
-        {/* Sector Performance & Pie Chart (Omitted for brevity, using original content) */}
+        {/* Sector Performance & Pie Chart (Unchanged) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-          {/* Sector Performance */}
           <div className={`${GlassCardStyles} p-6`}>
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
               <TrendingUp className="w-5 h-5 text-primary" />
@@ -416,7 +428,6 @@ export default function App() {
               ))}
             </div>
           </div>
-          {/* Market Distribution */}
           <div className={`${GlassCardStyles} p-6`}>
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
               <Activity className="w-5 h-5 text-primary" />
@@ -465,9 +476,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Top Gainers & Losers (Omitted for brevity, using original content) */}
+        {/* Top Gainers & Losers (Unchanged) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.4s' }}>
-          {/* Top Gainers */}
           <div className={`${GlassCardStyles} p-6`}>
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
               <ArrowUpRight className="w-5 h-5 text-secondary" />
@@ -500,7 +510,6 @@ export default function App() {
               ))}
             </div>
           </div>
-          {/* Top Losers */}
           <div className={`${GlassCardStyles} p-6`}>
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white">
               <ArrowUpRight className="w-5 h-5 text-destructive rotate-180" />
@@ -535,14 +544,14 @@ export default function App() {
           </div>
         </div>
 
-        {/* Market Trend Comparison - UPDATED */}
+        {/* Market Trend Comparison (DYNAMICALLY SELECTED INDEX vs COMPARISON INDEX) */}
         <section className={`${GlassCardStyles} p-6 animate-slide-up`} style={{ animationDelay: '0.5s' }}>
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
             <TrendingUp className="w-5 h-5 text-primary" />
-            Index Comparison (Last 30 Days)
+            Index Comparison ({mainIndexName} vs {comparisonIndexName})
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={currentPriceData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
+            <LineChart data={currentMainData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
               <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" opacity={0.5} tickLine={false} axisLine={false} />
               <YAxis
                 stroke="hsl(var(--muted-foreground))"
@@ -552,7 +561,7 @@ export default function App() {
                 tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
               />
               <Tooltip
-                formatter={(value) => `₹${Math.floor(value).toLocaleString()}`}
+                formatter={(value, name) => [`₹${Math.floor(value).toLocaleString()}`, name]}
                 contentStyle={{
                   background: 'hsl(var(--card))',
                   border: '1px solid hsl(var(--border))',
@@ -560,25 +569,25 @@ export default function App() {
                   color: 'hsl(var(--primary-foreground))'
                 }}
               />
-              {/* NIFTY 50 - Primary (White/Light) and Thicker */}
+              {/* Main Selected Index */}
               <Line
                 type="monotone"
-                dataKey="value"
+                dataKey="mainPrice"
                 stroke="hsl(var(--primary))"
                 strokeWidth={3}
-                dot={{ fill: 'hsl(var(--primary))', r: 3 }}
+                dot={false}
                 activeDot={{ stroke: 'hsl(var(--primary)', strokeWidth: 2, r: 6 }}
-                name="NIFTY 50"
+                name={mainIndexName}
               />
-              {/* SENSEX - Secondary (Green) and Distinct */}
+              {/* Comparison Index */}
               <Line
                 type="monotone"
-                dataKey="sensexValue" 
+                dataKey="comparisonPrice" 
                 stroke="hsl(var(--secondary))"
                 strokeWidth={2}
-                dot={{ fill: 'hsl(var(--secondary))', r: 3 }}
+                dot={false}
                 activeDot={{ stroke: 'hsl(var(--secondary)', strokeWidth: 2, r: 6 }}
-                name="SENSEX"
+                name={comparisonIndexName}
               />
             </LineChart>
           </ResponsiveContainer>

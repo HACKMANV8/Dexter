@@ -9,9 +9,7 @@ const Header = () => (
       <div className="text-2xl font-bold text-white flex items-center gap-2">
         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">α</div>
       </div>
-      <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center">
-        U
-      </div>
+      {/* The 'U' avatar was here and has been removed */}
     </div>
   </header>
 );
@@ -301,7 +299,7 @@ export default function StockBucketApp() {
             {/* Updated Title */}
             <h1 className="text-4xl sm:text-5xl font-extrabold gradient-text mb-2">Historical Backtest Dashboard</h1>
             <p className="text-lg text-gray-400">
-                Simulating **{totalStocks}** historical holding(s) based on **October 2024** data.
+                Simulate and validate your investment strategy against historical data.
             </p>
           </div>
           <button 
@@ -438,7 +436,7 @@ export default function StockBucketApp() {
               {/* Search Box */}
               <input
                 type="text"
-                placeholder="Search by symbol or name (50 results available)..."
+                placeholder="Search by symbol or name..."
                 className="w-full px-5 py-3 rounded-xl border border-gray-700 bg-gray-800 text-white outline-none mb-4 focus:border-blue-500 transition-all"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}

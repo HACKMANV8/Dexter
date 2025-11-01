@@ -9,14 +9,12 @@ const Header = () => (
         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">α</div>
         Fusion Analysis
       </div>
-      <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center">
-        U
-      </div>
+      {/* Removed the user icon div here to match the request */}
     </div>
   </header>
 );
 
-// Helper component to draw a simple line chart using SVG
+// Helper component to draw a simple line chart using SVG with area fill and current price marker
 const TrendLineChart = ({ data }) => {
   if (!data || data.length < 2) return null;
   
@@ -28,19 +26,52 @@ const TrendLineChart = ({ data }) => {
   const maxVal = Math.max(...data);
   const range = maxVal - minVal;
   
+  // Use a safe range to prevent division by zero if all data points are the same
+  const safeRange = range === 0 ? 1 : range;
+  
   const getX = (index) => (index / (data.length - 1)) * (width - 2 * padding) + padding;
-  const getY = (value) => height - padding - ((value - minVal) / range) * (height - 2 * padding);
+  // Invert Y axis for SVG (higher value = lower Y coordinate)
+  const getY = (value) => height - padding - ((value - minVal) / safeRange) * (height - 2 * padding);
   
-  const points = data.map((value, index) => `${getX(index)},${getY(value)}`).join(' ');
+  const linePoints = data.map((value, index) => `${getX(index)},${getY(value)}`).join(' ');
   
+  // Create points for the area fill
+  const areaPoints = [
+    `${getX(0)},${height - padding}`, 
+    linePoints,                     
+    `${getX(data.length - 1)},${height - padding}`, 
+    `${getX(0)},${height - padding}` 
+  ].join(' ');
+  
+  const lastX = getX(data.length - 1);
+  const lastY = getY(data[data.length - 1]);
+
   return (
     <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      {/* Define Gradient for the Area Fill */}
+      <defs>
+        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style={{ stopColor: "#60a5fa", stopOpacity: 0.5 }} />
+          <stop offset="100%" style={{ stopColor: "#60a5fa", stopOpacity: 0 }} />
+        </linearGradient>
+      </defs>
+
+      {/* Area Fill */}
+      <polyline 
+        fill="url(#chartGradient)"
+        points={areaPoints}
+      />
+      
+      {/* Line Stroke */}
       <polyline 
         fill="none"
-        stroke="#60a5fa" // Blue-400 (matches SearchPage primary color)
+        stroke="#60a5fa" 
         strokeWidth="2"
-        points={points}
+        points={linePoints}
       />
+      
+      {/* Current Price Marker */}
+      <circle cx={lastX} cy={lastY} r="3" fill="#60a5fa" stroke="#080a13" strokeWidth="1" />
     </svg>
   );
 };
@@ -278,13 +309,11 @@ export default function TrendsPage() {
                   </div>
                 </div>
                 
-                {/* AI Tip / Key Insight Section (New) */}
+                {/* Stock Analysis Text (The "down text" - AI Key Insight title removed) */}
                 <div className="mt-4 pt-4 border-t border-gray-700/50">
-                    <p className="text-sm font-semibold text-blue-400 mb-1 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        AI Key Insight
+                    <p className="text-sm text-gray-300 leading-relaxed">
+                        {stock.analysis}
                     </p>
-                    <p className="text-gray-300 text-sm">{stock.analysis}</p>
                 </div>
 
               </div>

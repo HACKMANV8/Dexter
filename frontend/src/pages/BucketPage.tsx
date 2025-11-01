@@ -20,9 +20,7 @@ const Header = () => (
         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">α</div>
         AlphaBucket
       </div>
-      <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center">
-        U
-      </div>
+      {/* The 'U' initial container has been removed from here */}
     </div>
   </header>
 );
