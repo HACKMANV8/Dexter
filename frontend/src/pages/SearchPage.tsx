@@ -56,7 +56,28 @@ const mockStocks = [
   { symbol: "HINDALCO", name: "Hindalco Industries", price: 482.95, sentiment: 86, technical: 81, fundamental: 90, overall: 86, recommendation: 'buy' },
 ];
 
-// Placeholder for the Header component (since external imports are not allowed)
+// --- Style Mapping Functions (Moved outside to be easily reusable) ---
+const getScoreColor = (score) => {
+  if (score >= 75) return "text-green-400"; // Buy/Strong
+  if (score >= 50) return "text-yellow-400"; // Hold/Neutral
+  return "text-red-400"; // Sell/Weak
+};
+
+const getBarColor = (score) => {
+  if (score >= 75) return "bg-green-600";
+  if (score >= 50) return "bg-yellow-600";
+  return "bg-red-600";
+};
+
+const getRecommendationColor = (rec) => {
+  if (rec === 'buy') return "bg-green-600/20 text-green-400 border-green-600/30";
+  if (rec === 'hold') return "bg-yellow-600/20 text-yellow-400 border-yellow-600/30";
+  return "bg-red-600/20 text-red-400 border-red-600/30";
+};
+// --- End Style Mapping Functions ---
+
+
+// Placeholder for the Header component
 const Header = () => (
   <header className="sticky top-0 z-10 w-full backdrop-blur-md bg-gray-950/70 border-b border-gray-800/50">
     <div className="max-w-screen-2xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -64,12 +85,15 @@ const Header = () => (
         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">α</div>
         Fusion Analysis
       </div>
-      <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center">
-        U
+      {/* Explicitly empty right side to remove the 'u' and keep the header balanced */}
+      <div className="flex items-center gap-4">
+        {/* No user icon or other element here */}
       </div>
     </div>
   </header>
 );
+
+// Removed the TopPerformers component
 
 
 export default function SearchPage() {
@@ -89,28 +113,6 @@ export default function SearchPage() {
       setFilteredStocks(filtered);
     }
   };
-
-  // --- Style Mapping Functions ---
-  // Using concrete Tailwind classes to replace abstract theme names (secondary, chart-4, destructive)
-  const getScoreColor = (score) => {
-    if (score >= 75) return "text-green-400"; // Replaces text-secondary
-    if (score >= 50) return "text-yellow-400"; // Replaces text-chart-4
-    return "text-red-400"; // Replaces text-destructive
-  };
-
-  const getBarColor = (score) => {
-    if (score >= 75) return "bg-green-600";
-    if (score >= 50) return "bg-yellow-600";
-    return "bg-red-600";
-  };
-
-  const getRecommendationColor = (rec) => {
-    if (rec === 'buy') return "bg-green-600/20 text-green-400 border-green-600/30";
-    if (rec === 'hold') return "bg-yellow-600/20 text-yellow-400 border-yellow-600/30";
-    return "bg-red-600/20 text-red-400 border-red-600/30";
-  };
-  // --- End Style Mapping Functions ---
-
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
@@ -183,6 +185,8 @@ export default function SearchPage() {
             />
           </div>
         </div>
+
+        {/* Removed Top Performers Section here */}
         
         {/* Stock Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
